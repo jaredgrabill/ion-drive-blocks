@@ -1,0 +1,255 @@
+{
+  "$schema": "https://ion-drive.dev/schema/block.json",
+  "name": "invoicing",
+  "version": "0.1.0",
+  "title": "Invoicing",
+  "description": "Invoices, line items, and payments — billing on top of your CRM.",
+  "author": "Ion Shift Labs <hello@ionshiftlabs.com>",
+  "categories": [
+    "finance",
+    "billing"
+  ],
+  "dependencies": [
+    "crm"
+  ],
+  "meta": {
+    "icon": "🧾",
+    "docs": "https://ion-drive.dev/blocks/invoicing",
+    "secrets": {
+      "stripe_secret_key": "Stripe API secret key (sk_test_… / sk_live_…) — required by create_payment_link",
+      "stripe_webhook_secret": "Stripe webhook signing secret (whsec_…) — required by the stripe hook"
+    }
+  },
+  "actions": [
+    {
+      "name": "create_payment_link",
+      "description": "Create a Stripe Checkout payment link for an invoice and store it on the record.",
+      "input": {
+        "type": "object",
+        "properties": {
+          "invoice_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "The invoice to collect payment for"
+          }
+        },
+        "required": [
+          "invoice_id"
+        ]
+      }
+    }
+  ],
+  "hooks": [
+    {
+      "name": "stripe",
+      "description": "Stripe webhook receiver — verifies the signature and marks invoices paid on checkout.session.completed."
+    }
+  ],
+  "objects": [
+    {
+      "name": "invoices",
+      "displayName": "Invoices",
+      "description": "Bills issued to companies.",
+      "fields": [
+        {
+          "name": "number",
+          "displayName": "Invoice #",
+          "columnType": "short_text",
+          "isRequired": true,
+          "isUnique": true
+        },
+        {
+          "name": "status",
+          "displayName": "Status",
+          "columnType": "enum",
+          "defaultValue": "draft",
+          "constraints": {
+            "enumValues": [
+              "draft",
+              "sent",
+              "paid",
+              "overdue",
+              "void"
+            ]
+          }
+        },
+        {
+          "name": "issue_date",
+          "displayName": "Issue Date",
+          "columnType": "date"
+        },
+        {
+          "name": "due_date",
+          "displayName": "Due Date",
+          "columnType": "date"
+        },
+        {
+          "name": "subtotal",
+          "displayName": "Subtotal",
+          "columnType": "currency"
+        },
+        {
+          "name": "tax",
+          "displayName": "Tax",
+          "columnType": "currency"
+        },
+        {
+          "name": "total",
+          "displayName": "Total",
+          "columnType": "currency"
+        },
+        {
+          "name": "notes",
+          "displayName": "Notes",
+          "columnType": "long_text"
+        },
+        {
+          "name": "payment_link",
+          "displayName": "Payment Link",
+          "columnType": "url",
+          "description": "Stripe Checkout URL created by the create_payment_link action."
+        },
+        {
+          "name": "stripe_session_id",
+          "displayName": "Stripe Session",
+          "columnType": "short_text",
+          "description": "Stripe Checkout session id - set by create_payment_link, matched by the webhook."
+        }
+      ]
+    },
+    {
+      "name": "line_items",
+      "displayName": "Line Items",
+      "description": "Individual charges on an invoice.",
+      "fields": [
+        {
+          "name": "description",
+          "displayName": "Description",
+          "columnType": "short_text",
+          "isRequired": true
+        },
+        {
+          "name": "quantity",
+          "displayName": "Quantity",
+          "columnType": "decimal",
+          "defaultValue": "1"
+        },
+        {
+          "name": "unit_price",
+          "displayName": "Unit Price",
+          "columnType": "currency"
+        },
+        {
+          "name": "amount",
+          "displayName": "Amount",
+          "columnType": "currency"
+        }
+      ]
+    },
+    {
+      "name": "payments",
+      "displayName": "Payments",
+      "description": "Money received against invoices.",
+      "fields": [
+        {
+          "name": "amount",
+          "displayName": "Amount",
+          "columnType": "currency",
+          "isRequired": true
+        },
+        {
+          "name": "method",
+          "displayName": "Method",
+          "columnType": "enum",
+          "constraints": {
+            "enumValues": [
+              "card",
+              "bank_transfer",
+              "cash",
+              "check"
+            ]
+          }
+        },
+        {
+          "name": "paid_at",
+          "displayName": "Paid At",
+          "columnType": "datetime"
+        },
+        {
+          "name": "reference",
+          "displayName": "Reference",
+          "columnType": "short_text"
+        }
+      ]
+    }
+  ],
+  "relationships": [
+    {
+      "name": "company",
+      "displayName": "Company",
+      "type": "many_to_one",
+      "sourceObjectName": "invoices",
+      "targetObjectName": "companies"
+    },
+    {
+      "name": "invoice",
+      "displayName": "Invoice",
+      "type": "many_to_one",
+      "sourceObjectName": "line_items",
+      "targetObjectName": "invoices",
+      "cascadeDelete": true
+    },
+    {
+      "name": "invoice",
+      "displayName": "Invoice",
+      "type": "many_to_one",
+      "sourceObjectName": "payments",
+      "targetObjectName": "invoices"
+    }
+  ],
+  "roles": [
+    {
+      "name": "billing_clerk",
+      "description": "Manage invoices, line items, and payments.",
+      "permissions": [
+        {
+          "resource": "invoices",
+          "actions": [
+            "create",
+            "read",
+            "update",
+            "delete"
+          ]
+        },
+        {
+          "resource": "line_items",
+          "actions": [
+            "create",
+            "read",
+            "update",
+            "delete"
+          ]
+        },
+        {
+          "resource": "payments",
+          "actions": [
+            "create",
+            "read",
+            "update",
+            "delete"
+          ]
+        }
+      ]
+    }
+  ],
+  "code": [
+    {
+      "path": "index.ts",
+      "contents": "/**\n * Invoicing block — vendored logic entry point. This file is YOURS.\n *\n * `ion-drive add invoicing` copied it to blocks/invoicing/ and wired it into\n * blocks/index.ts; your server.ts passes it to `createServer`, which runs\n * `setup` at boot. Everything registered here is declared in the block's\n * manifest, so the platform exposes it automatically:\n *\n *  - action `create_payment_link` → POST /api/v1/blocks/invoicing/actions/create_payment_link\n *    (also an MCP tool: `invoicing_create_payment_link`, and in the OpenAPI spec)\n *  - hook `stripe`               → POST /api/v1/hooks/invoicing/stripe\n *    (session-auth exempt; authenticity = the Stripe signature we verify)\n *\n * Setup (one-time):\n *  1. Store your Stripe keys as Ion Drive secrets (admin console → Secrets, or\n *     POST /api/v1/secrets): `stripe_secret_key`, `stripe_webhook_secret`.\n *  2. Point a Stripe webhook (event: checkout.session.completed) at\n *     https://<your host>/api/v1/hooks/invoicing/stripe\n */\nimport { definePlugin } from '@ionshift/ion-drive-core';\nimport { z } from 'zod';\nimport { createCheckoutSession, verifyStripeSignature } from './stripe.js';\n\nexport default definePlugin({\n  name: 'invoicing',\n\n  setup(ctx) {\n    // ------------------------------------------------------------------\n    // Action: create a Stripe payment link for an invoice\n    // ------------------------------------------------------------------\n    ctx.actions.registerAction({\n      block: 'invoicing',\n      name: 'create_payment_link',\n      description: 'Create a Stripe Checkout payment link for an invoice.',\n      // The Zod schema validates requests (400 with issues on failure) and\n      // shapes the MCP tool's parameters.\n      input: z.object({ invoice_id: z.string().uuid() }),\n      handler: async (actionCtx) => {\n        const { invoice_id } = actionCtx.input as { invoice_id: string };\n\n        const secretKey = await actionCtx.secrets.get('stripe_secret_key');\n        if (!secretKey) {\n          throw new Error('Secret \"stripe_secret_key\" is not set — add it before creating links.');\n        }\n\n        const invoice = await actionCtx.dataService.getById('invoices', invoice_id);\n        if (!invoice) throw new Error(`Invoice ${invoice_id} not found`);\n        const record = invoice.data as { number: string; total: string | number | null };\n        const totalCents = Math.round(Number(record.total ?? 0) * 100);\n        if (!Number.isFinite(totalCents) || totalCents <= 0) {\n          throw new Error(`Invoice ${record.number} has no positive total to collect.`);\n        }\n\n        // Where Stripe sends the customer after paying. Adjust to your app.\n        const successUrl = `${actionCtx.config.publicUrl ?? `http://localhost:${actionCtx.config.port}`}/payments/success`;\n\n        const session = await createCheckoutSession(\n          secretKey,\n          { id: invoice_id, number: record.number, totalCents },\n          successUrl,\n        );\n\n        // Persist the link + session id so the webhook can match the invoice\n        // and your app/grid can show the URL.\n        await actionCtx.dataService.update('invoices', invoice_id, {\n          payment_link: session.url,\n          stripe_session_id: session.id,\n          status: 'sent',\n        });\n\n        actionCtx.logger.info('Payment link created', { invoice: record.number });\n        return { url: session.url, session_id: session.id };\n      },\n    });\n\n    // ------------------------------------------------------------------\n    // Hook: Stripe webhook receiver (raw body → verify → mark paid)\n    // ------------------------------------------------------------------\n    ctx.actions.registerHook({\n      block: 'invoicing',\n      name: 'stripe',\n      description: 'Verifies Stripe signatures and marks invoices paid.',\n      handler: async (hookCtx) => {\n        const webhookSecret = await hookCtx.secrets.get('stripe_webhook_secret');\n        if (!webhookSecret) {\n          return { status: 500, body: { error: 'stripe_webhook_secret is not configured' } };\n        }\n\n        // Verify BEFORE parsing — the signature covers the exact raw bytes.\n        const signature = hookCtx.headers['stripe-signature'];\n        const ok = verifyStripeSignature(\n          hookCtx.rawBody,\n          Array.isArray(signature) ? signature[0] : signature,\n          webhookSecret,\n        );\n        if (!ok) {\n          hookCtx.logger.warn('Rejected Stripe delivery: bad signature');\n          return { status: 400, body: { error: 'invalid signature' } };\n        }\n\n        const event = JSON.parse(hookCtx.rawBody.toString('utf8')) as {\n          type: string;\n          data: { object: { id: string; metadata?: { invoice_id?: string } } };\n        };\n\n        if (event.type === 'checkout.session.completed') {\n          const invoiceId = event.data.object.metadata?.invoice_id;\n          if (invoiceId) {\n            await hookCtx.dataService.update('invoices', invoiceId, { status: 'paid' });\n            hookCtx.logger.info('Invoice marked paid via Stripe webhook', { invoiceId });\n          }\n        }\n\n        // Always 200 verified deliveries — Stripe retries anything else.\n        return { status: 200, body: { received: true } };\n      },\n    });\n  },\n});\n"
+    },
+    {
+      "path": "stripe.ts",
+      "contents": "/**\n * Thin Stripe client for the invoicing block — this file is YOURS.\n *\n * It was vendored into your project by `ion-drive add invoicing` (shadcn-style:\n * you own the copy). Edit it freely — the dev server hot-reloads. It talks to\n * Stripe's REST API with the built-in `fetch`, so there is no SDK dependency.\n *\n * Two capabilities:\n *  1. {@link createCheckoutSession} — a Stripe Checkout session whose URL acts\n *     as a payment link for an invoice.\n *  2. {@link verifyStripeSignature} — HMAC verification of Stripe webhook\n *     deliveries (the `Stripe-Signature` header signs the *raw* body bytes).\n *\n * Configuration comes from Ion Drive secrets (never hardcode keys):\n *  - `stripe_secret_key`     — sk_test_… / sk_live_…\n *  - `stripe_webhook_secret` — whsec_… (from your webhook endpoint's settings)\n *\n * `STRIPE_API_BASE` (env) overrides the API host — useful for tests/mocks.\n */\n\nimport { createHmac, timingSafeEqual } from 'node:crypto';\n\nconst API_BASE = process.env.STRIPE_API_BASE ?? 'https://api.stripe.com';\n\nexport interface CheckoutSession {\n  id: string;\n  url: string;\n}\n\n/**\n * Creates a Stripe Checkout session for a single invoice. Amounts are sent in\n * cents; the invoice id rides in `metadata` so the webhook can find the record.\n */\nexport async function createCheckoutSession(\n  secretKey: string,\n  invoice: { id: string; number: string; totalCents: number; currency?: string },\n  successUrl: string,\n): Promise<CheckoutSession> {\n  // Stripe's API is form-encoded, not JSON.\n  const body = new URLSearchParams({\n    mode: 'payment',\n    success_url: successUrl,\n    'metadata[invoice_id]': invoice.id,\n    'line_items[0][quantity]': '1',\n    'line_items[0][price_data][currency]': invoice.currency ?? 'usd',\n    'line_items[0][price_data][unit_amount]': String(invoice.totalCents),\n    'line_items[0][price_data][product_data][name]': `Invoice ${invoice.number}`,\n  });\n\n  const res = await fetch(`${API_BASE}/v1/checkout/sessions`, {\n    method: 'POST',\n    headers: {\n      authorization: `Bearer ${secretKey}`,\n      'content-type': 'application/x-www-form-urlencoded',\n    },\n    body,\n  });\n\n  const payload = (await res.json()) as {\n    id?: string;\n    url?: string;\n    error?: { message?: string };\n  };\n  if (!res.ok || !payload.id || !payload.url) {\n    throw new Error(`Stripe checkout session failed: ${payload.error?.message ?? res.status}`);\n  }\n  return { id: payload.id, url: payload.url };\n}\n\n/**\n * Verifies a Stripe webhook signature (https://docs.stripe.com/webhooks#verify-manually).\n *\n * The `Stripe-Signature` header carries `t=<timestamp>,v1=<hmac>[,…]`; the HMAC\n * is SHA-256 over `\"<timestamp>.<raw body>\"` keyed with the webhook secret.\n * Returns true only for a matching signature within `toleranceSeconds` of now\n * (replay protection). Comparison is constant-time.\n */\nexport function verifyStripeSignature(\n  rawBody: Buffer,\n  signatureHeader: string | undefined,\n  webhookSecret: string,\n  toleranceSeconds = 300,\n): boolean {\n  if (!signatureHeader) return false;\n\n  // Parse \"t=169…,v1=abc…,v1=def…\" — multiple v1 entries are allowed.\n  const parts = new Map<string, string[]>();\n  for (const pair of signatureHeader.split(',')) {\n    const eq = pair.indexOf('=');\n    if (eq === -1) continue;\n    const key = pair.slice(0, eq).trim();\n    const value = pair.slice(eq + 1).trim();\n    parts.set(key, [...(parts.get(key) ?? []), value]);\n  }\n\n  const timestamp = Number(parts.get('t')?.[0]);\n  const candidates = parts.get('v1') ?? [];\n  if (!Number.isFinite(timestamp) || candidates.length === 0) return false;\n  if (Math.abs(Date.now() / 1000 - timestamp) > toleranceSeconds) return false;\n\n  const expected = createHmac('sha256', webhookSecret)\n    .update(`${timestamp}.${rawBody.toString('utf8')}`)\n    .digest('hex');\n  const expectedBuf = Buffer.from(expected, 'utf8');\n\n  return candidates.some((candidate) => {\n    const candidateBuf = Buffer.from(candidate, 'utf8');\n    return candidateBuf.length === expectedBuf.length && timingSafeEqual(candidateBuf, expectedBuf);\n  });\n}\n"
+    }
+  ]
+}

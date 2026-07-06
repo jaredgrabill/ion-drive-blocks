@@ -1,0 +1,45 @@
+{
+  "$schema": "https://ionshift.dev/schemas/block-registry.json",
+  "blocks": {
+    "crm": {
+      "title": "CRM",
+      "description": "Companies, contacts, deals, and activities — a sales pipeline foundation.",
+      "categories": ["sales", "crm"],
+      "dependencies": [],
+      "latest": "0.1.0",
+      "versions": {
+        "0.1.0": "https://raw.githubusercontent.com/ionshift/blocks/main/crm/dist/block.json"
+      }
+    },
+    "invoicing": {
+      "title": "Invoicing",
+      "description": "Invoices, line items, and payments — with Stripe payment links (vendored logic).",
+      "categories": ["finance", "billing"],
+      "dependencies": ["crm"],
+      "latest": "0.1.0",
+      "versions": {
+        "0.1.0": "https://raw.githubusercontent.com/ionshift/blocks/main/invoicing/dist/block.json"
+      }
+    },
+    "communications": {
+      "title": "Communications",
+      "description": "Message log, templates, and campaigns for outbound communication.",
+      "categories": ["communication"],
+      "dependencies": [],
+      "latest": "0.1.0",
+      "versions": {
+        "0.1.0": "https://raw.githubusercontent.com/ionshift/blocks/main/communications/dist/block.json"
+      }
+    },
+    "audit": {
+      "title": "Audit Log",
+      "description": "Records every data change (create/update/delete) into an audit_log object.",
+      "categories": ["observability", "compliance"],
+      "dependencies": [],
+      "latest": "0.1.0",
+      "versions": {
+        "0.1.0": "https://raw.githubusercontent.com/ionshift/blocks/main/audit/dist/block.json"
+      }
+    }
+  }
+}
