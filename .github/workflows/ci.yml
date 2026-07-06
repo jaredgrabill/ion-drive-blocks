@@ -11,7 +11,7 @@ jobs:
       - uses: actions/setup-node@v4
         with: { node-version: 22 }
       # The CLI provides validate/pack; core provides the authoritative Zod parser.
-      - run: npm install -g @ionshift/ion-drive-cli @ionshift/ion-drive-core
+      - run: npm install -g @ion-drive/cli @ion-drive/core
       - name: Validate + pack every block
         run: |
           for dir in crm invoicing communications audit; do

@@ -17,7 +17,7 @@
  *  2. Point a Stripe webhook (event: checkout.session.completed) at
  *     https://<your host>/api/v1/hooks/invoicing/stripe
  */
-import { definePlugin } from '@ionshift/ion-drive-core';
+import { definePlugin } from '@ion-drive/core';
 import { z } from 'zod';
 import { createCheckoutSession, verifyStripeSignature } from './stripe.js';
 

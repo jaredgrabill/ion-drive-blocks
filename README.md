@@ -1,6 +1,6 @@
 # Ion Drive official building blocks
 
-The official block catalog for [Ion Drive](https://github.com/ionshift/ion-drive) — plus the
+The official block catalog for [Ion Drive](https://github.com/jaredgrabill/ion-drive) — plus the
 **registry index** the CLI resolves blocks from (`registry/index.json`).
 
 One directory per block:

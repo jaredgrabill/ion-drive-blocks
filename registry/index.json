@@ -1,5 +1,5 @@
 {
-  "$schema": "https://ionshift.dev/schemas/block-registry.json",
+  "$schema": "https://ion-drive.dev/schemas/block-registry.json",
   "blocks": {
     "crm": {
       "title": "CRM",
@@ -8,7 +8,7 @@
       "dependencies": [],
       "latest": "0.1.0",
       "versions": {
-        "0.1.0": "https://raw.githubusercontent.com/ionshift/blocks/main/crm/dist/block.json"
+        "0.1.0": "https://raw.githubusercontent.com/jaredgrabill/ion-drive-blocks/main/crm/dist/block.json"
       }
     },
     "invoicing": {
@@ -18,7 +18,7 @@
       "dependencies": ["crm"],
       "latest": "0.1.0",
       "versions": {
-        "0.1.0": "https://raw.githubusercontent.com/ionshift/blocks/main/invoicing/dist/block.json"
+        "0.1.0": "https://raw.githubusercontent.com/jaredgrabill/ion-drive-blocks/main/invoicing/dist/block.json"
       }
     },
     "communications": {
@@ -28,7 +28,7 @@
       "dependencies": [],
       "latest": "0.1.0",
       "versions": {
-        "0.1.0": "https://raw.githubusercontent.com/ionshift/blocks/main/communications/dist/block.json"
+        "0.1.0": "https://raw.githubusercontent.com/jaredgrabill/ion-drive-blocks/main/communications/dist/block.json"
       }
     },
     "audit": {
@@ -38,7 +38,7 @@
       "dependencies": [],
       "latest": "0.1.0",
       "versions": {
-        "0.1.0": "https://raw.githubusercontent.com/ionshift/blocks/main/audit/dist/block.json"
+        "0.1.0": "https://raw.githubusercontent.com/jaredgrabill/ion-drive-blocks/main/audit/dist/block.json"
       }
     }
   }
