@@ -1,0 +1,31 @@
+{
+  "$schema": "https://ion-drive.dev/schemas/registry-block.v1.json",
+  "schemaVersion": 1,
+  "name": "crm",
+  "title": "CRM",
+  "description": "Leads, companies, contacts, deals, and activities — lead capture, conversion, and a stage-tracked sales pipeline.",
+  "categories": [
+    "sales",
+    "crm"
+  ],
+  "repository": "https://github.com/jaredgrabill/ion-drive-blocks",
+  "latest": "0.2.0",
+  "versions": {
+    "0.2.0": {
+      "artifactUrl": "../../crm/dist/0.2.0/block.json",
+      "digest": "sha256:cbd449bb3cf47fe7c09e4e567e7ec726d5923c1015c2edd89719fbce708a1b5a",
+      "size": 46849,
+      "publishedAt": "2026-07-08T22:38:16Z",
+      "dependencies": {},
+      "requires": {
+        "core": ">=0.2.0 <1.0.0",
+        "handlers": [
+          "persist_event"
+        ],
+        "plugins": []
+      },
+      "status": "active"
+    }
+  },
+  "advisories": []
+}

@@ -131,10 +131,16 @@ schema. Top-level keys:
 
 ### Install pipeline
 
-`ion-drive add <name|url|path>` resolves the registry index
-(`registry/index.json` in this repo maps `name → version → artifact URL`),
-resolves dependencies recursively (topological order, installed blocks pruned),
-then performs a two-part install (ADR-018):
+`ion-drive add <ref|url|path>` resolves refs like `crm@^0.2` against a
+**protocol-v1 registry** (this repo, served at `registry.iondrive.dev`):
+`registry/index.json` (directory: name → summary + `latest`) →
+`registry/blocks/<name>.json` (full version history with a **sha256 digest
+per immutable version** at `<name>/dist/<version>/block.json`). The resolver
+collects semver ranges across the dependency closure, picks the highest
+satisfying versions (topological order, installed blocks pruned), and
+**verifies each artifact's digest** — plus its sigstore attestation when
+present (the `◆ official` / `✔ verified` trust badges) — before the two-part
+install (ADR-018):
 
 1. **Vendor the code** — `code/` is copied to the consumer's `blocks/<name>/`
    and wired into the `blocks/index.ts` barrel. From then on it's their code.
@@ -154,6 +160,9 @@ server-side. `remove` uninstalls schema but never deletes vendored code.
 - Keep vendored code **thin and heavily commented**: call platform services,
   never re-implement plumbing.
 - Toolchain: `ion-drive block validate <name>` (platform Zod schema +
-  structural code checks) and `ion-drive block pack <name>` (emits
-  `dist/block.json` with `code/` embedded — what the registry serves). CI fails
-  on artifact drift.
+  structural code checks), `ion-drive block pack <name>` (emits the immutable
+  `dist/<version>/block.json` with `code/` embedded — what the registry
+  serves), and `ion-drive registry build` (regenerates the registry JSON,
+  append-only). CI fails on drift and refuses any mutation of released
+  artifacts or version entries; publishing happens on merge to `main`
+  (validate → pack → attest → commit — see `docs/registry-operations.md`).

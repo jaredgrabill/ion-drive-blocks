@@ -1,7 +1,8 @@
 # Ion Drive official building blocks
 
-The official block catalog for [Ion Drive](https://github.com/jaredgrabill/ion-drive) — plus the
-**registry index** the CLI resolves blocks from (`registry/index.json`).
+The official block registry for [Ion Drive](https://github.com/jaredgrabill/ion-drive) — the
+built-in `@ion` namespace, served as **protocol-v1** static JSON at
+`https://registry.iondrive.dev` (this repo's root, via GitHub Pages).
 
 One directory per block:
 
@@ -13,24 +14,46 @@ One directory per block:
 | `communications/` | Message log, templates, campaigns |
 | `audit/` | Cluster-wide audit log via the message bus |
 
-## Block layout
+## Layout (registry protocol v1)
 
 ```
+registry.config.json          # registry identity (name, repository, trust)
+registries.json               # PR-reviewed directory of other registries
+registry/index.json           # GENERATED directory: name → summary + latest
+registry/blocks/<name>.json   # GENERATED per-block version history + digests
+schemas/*.v1.json             # published JSON Schemas (copied from @ion-drive/core)
 <name>/
-  block.json        # manifest — the source of truth
-  code/             # vendored TypeScript (only for logic-bearing blocks)
-  dist/block.json   # distributable artifact (code embedded) — what the registry serves
+  block.json                  # manifest — the source of truth
+  code/                       # vendored TypeScript (only for logic-bearing blocks)
+  dist/<version>/block.json   # IMMUTABLE released artifact (code embedded)
+  dist/<version>/block.json.sigstore.json  # attestation bundle (CI-produced)
 ```
 
-Official blocks distribute through the exact same pipeline a third-party block does:
-the registry index maps `name → version → artifact URL`; `ion-drive add <name>` fetches
-the artifact, vendors `code/` into the consumer's project, and installs the manifest.
+Resolution: `ion-drive add crm@^0.2` reads `registry/index.json` →
+`registry/blocks/crm.json` → picks the highest satisfying version → fetches
+the immutable artifact, **verifies its sha256 digest** (and, when attested,
+its sigstore provenance — that's the `◆ official` badge), vendors `code/`
+into the consumer's project, and installs the manifest. Official blocks ride
+the exact same pipeline a third-party registry does.
+
+## Publishing a version
+
+Bump `version` in the block's `block.json`, PR, merge — CI validates every
+block (glob-discovered) and guards immutability; the merge to `main` packs,
+**attests** (GitHub artifact attestations), and commits the new
+`dist/<version>/` artifact + registry JSON. Released `(name, version)` bytes
+never change; fixing anything means a new version.
+
+Full procedures (yank, advisories, takedown, directory review, serving):
+[`docs/registry-operations.md`](docs/registry-operations.md).
 
 ## Develop
 
 ```bash
 ion-drive block validate <name>   # platform Zod schema + code checks
-ion-drive block pack <name>       # emit <name>/dist/block.json
+ion-drive block pack <name>       # emit <name>/dist/<version>/block.json
+ion-drive registry build          # regenerate registry JSON (append-only)
+ion-drive registry build --check  # CI's drift/immutability guard
 ```
 
 Test a block against a scaffolded project without publishing anything:
@@ -39,12 +62,11 @@ Test a block against a scaffolded project without publishing anything:
 cd ../my-app && ion-drive add ../blocks/invoicing
 ```
 
-CI runs validate + pack for every block and fails on artifact drift.
-
 ## Docs
 
+- [`docs/registry-operations.md`](docs/registry-operations.md) — publish, yank, advisory, takedown, and serving runbook.
 - [`docs/platform.md`](docs/platform.md) — Ion Drive concept, goals, core architecture, and the block manifest, condensed from the platform repo.
-- [`docs/specs/`](docs/specs/README.md) — design specs for upcoming blocks (`catalog`, `projects`, `support`, `scheduling`) and the [ERP suite map](docs/specs/erp-suite.md).
+- [`docs/specs/`](docs/specs/README.md) — design specs for upcoming blocks (`projects`, `support`, `scheduling`) and the [ERP suite map](docs/specs/erp-suite.md).
 
 ## License
 

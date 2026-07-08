@@ -1,0 +1,138 @@
+# Reusable block-publish workflow (spec-05 §3) — the block analog of the
+# platform repo's release.yml. Called by publish.yml here and by third-party
+# registry repos via `uses: jaredgrabill/ion-drive-blocks/.github/workflows/publish-block.yml@v1`.
+#
+# Flow: guards (append-only --check + git-diff belt) → registry build →
+# attest new artifacts (GitHub artifact attestations: OIDC → Fulcio → Rekor) →
+# re-run build (idempotent; lands attestationUrl) → commit + push to main.
+# `dry-run: true` runs everything except attest/commit — the rehearsal path.
+name: publish-block
+
+on:
+  workflow_call:
+    inputs:
+      dry-run:
+        type: boolean
+        default: false
+      block:
+        # Limit to one block; default publishes every unpublished version.
+        type: string
+        required: false
+
+permissions:
+  contents: write # commit dist/ + registry/ back to main
+  id-token: write # sigstore (Fulcio) OIDC
+  attestations: write # actions/attest-build-provenance
+
+# One publish at a time — the publish commit itself triggers a (no-op) re-run.
+concurrency:
+  group: registry-publish
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      # Pinned to the CLI/core minor this registry is built with; the CLI's
+      # version-skew warning covers drift within the range.
+      - name: Install Ion Drive CLI + core
+        run: npm install -g @ion-drive/cli@^0.3 @ion-drive/core@^0.3
+
+      # Guard 1: the generator itself must refuse nothing. --check exits
+      # non-zero on pending *additions* too (expected before a publish), so
+      # only the refusals list is load-bearing here.
+      - name: Guard — immutability refusals
+        run: |
+          ion-drive registry build --check --json > check.json || true
+          jq -e '.refusals | length == 0' check.json > /dev/null || {
+            echo '::error::registry build refused (immutability violation):'
+            jq -r '.refusals[]' check.json
+            exit 1
+          }
+
+      - name: Build registry (packs unpublished versions)
+        run: |
+          ion-drive registry build --json ${{ inputs.block && format('--block {0}', inputs.block) || '' }} > build.json
+          jq '{packed, wrote, warnings}' build.json
+
+      # Guard 2 (belt): the build must only ADD files — a modified tracked
+      # file under any dist/ means a released artifact changed.
+      - name: Guard — released artifacts untouched
+        run: |
+          if [ -n "$(git diff --name-only -- '*/dist/')" ]; then
+            echo '::error::build modified released artifacts:'
+            git diff --name-only -- '*/dist/'
+            exit 1
+          fi
+
+      - name: Collect newly packed artifacts
+        id: packed
+        run: |
+          count=$(jq '.packed | length' build.json)
+          echo "count=$count" >> "$GITHUB_OUTPUT"
+          {
+            echo 'subjects<<EOF'
+            jq -r '.packed[].artifactPath' build.json
+            echo 'EOF'
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Attest build provenance
+        if: ${{ !inputs.dry-run && steps.packed.outputs.count != '0' }}
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: ${{ steps.packed.outputs.subjects }}
+
+      # Download each bundle adjacent to its artifact as
+      # <artifact>.sigstore.json, then re-run the (idempotent) build so
+      # attestationUrl lands in the per-block JSON (D5: the one legal
+      # absent→present mutation).
+      - name: Place attestation bundles + finalize registry JSON
+        if: ${{ !inputs.dry-run && steps.packed.outputs.count != '0' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          jq -r '.packed[] | "\(.artifactPath) \(.digest)"' build.json | while read -r artifact digest; do
+            gh attestation download "$artifact" --repo "${{ github.repository }}" --limit 1 > /dev/null
+            # gh writes the bundle to ./<digest>.jsonl — move it adjacent.
+            mv "$digest.jsonl" "$artifact.sigstore.json"
+          done
+          ion-drive registry build --json > finalize.json
+          jq '{wrote, refusals}' finalize.json
+          jq -e '.refusals | length == 0' finalize.json > /dev/null
+
+      - name: Commit and push
+        if: ${{ !inputs.dry-run && steps.packed.outputs.count != '0' }}
+        run: |
+          names=$(jq -r '[.packed[] | "\(.name)@\(.version)"] | join(", ")' build.json)
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add -A
+          # No [skip ci]: the publish commit must itself pass CI; change
+          # detection makes the triggered re-run a no-op.
+          git commit -m "publish: $names"
+          git push origin HEAD:main
+
+      - name: Job summary
+        run: |
+          {
+            if [ "${{ inputs.dry-run }}" = "true" ]; then
+              echo '## Publish rehearsal (dry run) — nothing was committed'
+            else
+              echo '## Published block versions'
+            fi
+            echo ''
+            echo '| Block | Version | Digest | Attestation (Rekor) |'
+            echo '|---|---|---|---|'
+            jq -r '.packed[] | "| \(.name) | \(.version) | `\(.digest)` | [search.sigstore.dev](https://search.sigstore.dev/?hash=\(.digest | ltrimstr("sha256:"))) |"' build.json
+            if [ "$(jq '.packed | length' build.json)" = "0" ]; then
+              echo ''
+              echo '_Nothing to publish — every manifest version is already released._'
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"

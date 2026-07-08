@@ -1,0 +1,7 @@
+{
+  "name": "Ion Drive Official Blocks",
+  "description": "The main Ion Drive block registry.",
+  "homepage": "https://registry.iondrive.dev",
+  "repository": "https://github.com/jaredgrabill/ion-drive-blocks",
+  "trust": "official"
+}

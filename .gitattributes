@@ -1,0 +1,9 @@
+# Released artifacts and generated registry JSON are byte-addressed content —
+# their sha256 digests are recorded in registry/blocks/*.json and verified by
+# every `ion-drive add`. Disable EOL translation so a Windows checkout serves
+# (and `registry build --check` hashes) exactly the committed bytes.
+*/dist/** -text
+registry/** -text
+schemas/** -text
+registries.json -text
+registry.config.json -text

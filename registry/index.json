@@ -1,55 +1,65 @@
 {
-  "$schema": "https://ion-drive.dev/schemas/block-registry.json",
+  "$schema": "https://ion-drive.dev/schemas/registry-index.v1.json",
+  "schemaVersion": 1,
+  "name": "Ion Drive Official Blocks",
+  "description": "The main Ion Drive block registry.",
+  "homepage": "https://registry.iondrive.dev",
+  "generatedAt": "2026-07-08T22:38:16Z",
   "blocks": {
-    "crm": {
-      "title": "CRM",
-      "description": "Leads, companies, contacts, deals, and activities — lead capture, conversion, and a stage-tracked pipeline (vendored logic).",
-      "categories": ["sales", "crm"],
-      "dependencies": [],
-      "latest": "0.2.0",
-      "versions": {
-        "0.2.0": "https://raw.githubusercontent.com/jaredgrabill/ion-drive-blocks/main/crm/dist/block.json"
-      }
+    "audit": {
+      "title": "Audit Log",
+      "description": "Records every record create/update/delete into an audit_log table, with a system-field-free diff.",
+      "categories": [
+        "observability",
+        "compliance"
+      ],
+      "latest": "0.1.0",
+      "blockUrl": "blocks/audit.json",
+      "trust": "official"
     },
     "catalog": {
       "title": "Product Catalog",
-      "description": "Products with prices and lightweight stock tracking — pick a product and the price flows onto the invoice (vendored logic).",
-      "categories": ["commerce", "inventory"],
-      "dependencies": ["invoicing"],
+      "description": "Products with prices and lightweight stock tracking — pick a product and the price flows onto the invoice.",
+      "categories": [
+        "commerce",
+        "inventory"
+      ],
       "latest": "0.1.0",
-      "versions": {
-        "0.1.0": "https://raw.githubusercontent.com/jaredgrabill/ion-drive-blocks/main/catalog/dist/block.json"
-      }
-    },
-    "invoicing": {
-      "title": "Invoicing",
-      "description": "Invoices, line items, and payments — with Stripe payment links (vendored logic).",
-      "categories": ["finance", "billing"],
-      "dependencies": ["crm"],
-      "latest": "0.1.0",
-      "versions": {
-        "0.1.0": "https://raw.githubusercontent.com/jaredgrabill/ion-drive-blocks/main/invoicing/dist/block.json"
-      }
+      "blockUrl": "blocks/catalog.json",
+      "trust": "official"
     },
     "communications": {
       "title": "Communications",
-      "description": "Message log, templates, and campaigns for outbound communication.",
-      "categories": ["communication"],
-      "dependencies": [],
+      "description": "Email templates and a notification log for outbound messaging.",
+      "categories": [
+        "messaging",
+        "notifications"
+      ],
       "latest": "0.1.0",
-      "versions": {
-        "0.1.0": "https://raw.githubusercontent.com/jaredgrabill/ion-drive-blocks/main/communications/dist/block.json"
-      }
+      "blockUrl": "blocks/communications.json",
+      "trust": "official"
     },
-    "audit": {
-      "title": "Audit Log",
-      "description": "Records every data change (create/update/delete) into an audit_log object.",
-      "categories": ["observability", "compliance"],
-      "dependencies": [],
+    "crm": {
+      "title": "CRM",
+      "description": "Leads, companies, contacts, deals, and activities — lead capture, conversion, and a stage-tracked sales pipeline.",
+      "categories": [
+        "sales",
+        "crm"
+      ],
+      "latest": "0.2.0",
+      "blockUrl": "blocks/crm.json",
+      "trust": "official"
+    },
+    "invoicing": {
+      "title": "Invoicing",
+      "description": "Invoices, line items, and payments — billing on top of your CRM.",
+      "categories": [
+        "finance",
+        "billing"
+      ],
       "latest": "0.1.0",
-      "versions": {
-        "0.1.0": "https://raw.githubusercontent.com/jaredgrabill/ion-drive-blocks/main/audit/dist/block.json"
-      }
+      "blockUrl": "blocks/invoicing.json",
+      "trust": "official"
     }
   }
 }

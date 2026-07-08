@@ -1,0 +1,29 @@
+{
+  "$schema": "https://ion-drive.dev/schemas/registry-block.v1.json",
+  "schemaVersion": 1,
+  "name": "invoicing",
+  "title": "Invoicing",
+  "description": "Invoices, line items, and payments — billing on top of your CRM.",
+  "categories": [
+    "finance",
+    "billing"
+  ],
+  "repository": "https://github.com/jaredgrabill/ion-drive-blocks",
+  "latest": "0.1.0",
+  "versions": {
+    "0.1.0": {
+      "artifactUrl": "../../invoicing/dist/0.1.0/block.json",
+      "digest": "sha256:d382371b56ceb1ae8f3f8eae2b81d4d052d06387538d936b29ec714bcc9e4695",
+      "size": 15848,
+      "publishedAt": "2026-07-08T22:38:16Z",
+      "dependencies": {
+        "crm": "^0.2.0"
+      },
+      "requires": {
+        "core": ">=0.2.0 <1.0.0"
+      },
+      "status": "active"
+    }
+  },
+  "advisories": []
+}

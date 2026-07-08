@@ -1,0 +1,24 @@
+# The official registry's publish trigger (spec-05 §3): every merge to main
+# publishes whatever manifest versions have no released artifact yet (change
+# detection is inherent — already-published versions are skipped). Manual
+# dispatch defaults to a dry run (the release.yml rehearsal pattern).
+name: publish
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      dry-run:
+        type: boolean
+        default: true
+
+jobs:
+  publish:
+    uses: ./.github/workflows/publish-block.yml
+    with:
+      dry-run: ${{ inputs.dry-run || false }}
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write

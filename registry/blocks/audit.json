@@ -1,0 +1,27 @@
+{
+  "$schema": "https://ion-drive.dev/schemas/registry-block.v1.json",
+  "schemaVersion": 1,
+  "name": "audit",
+  "title": "Audit Log",
+  "description": "Records every record create/update/delete into an audit_log table, with a system-field-free diff.",
+  "categories": [
+    "observability",
+    "compliance"
+  ],
+  "repository": "https://github.com/jaredgrabill/ion-drive-blocks",
+  "latest": "0.1.0",
+  "versions": {
+    "0.1.0": {
+      "artifactUrl": "../../audit/dist/0.1.0/block.json",
+      "digest": "sha256:acc5cc83ca50ab1df5a96a43dd54b36bb10424e077dd5e11679a1fe9170cb8be",
+      "size": 2322,
+      "publishedAt": "2026-07-08T22:38:16Z",
+      "dependencies": {},
+      "requires": {
+        "core": ">=0.2.0 <1.0.0"
+      },
+      "status": "active"
+    }
+  },
+  "advisories": []
+}
