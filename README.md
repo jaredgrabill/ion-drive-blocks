@@ -7,7 +7,7 @@ One directory per block:
 
 | Block | What it is |
 |:--|:--|
-| `crm/` | Companies, contacts, deals, activities |
+| `crm/` | Leads, companies, contacts, deals, activities — **vendored conversion/pipeline logic** (`code/`) |
 | `invoicing/` | Invoices, line items, payments — **vendored Stripe logic** (`code/`) |
 | `communications/` | Message log, templates, campaigns |
 | `audit/` | Cluster-wide audit log via the message bus |
@@ -39,6 +39,11 @@ cd ../my-app && ion-drive add ../blocks/invoicing
 ```
 
 CI runs validate + pack for every block and fails on artifact drift.
+
+## Docs
+
+- [`docs/platform.md`](docs/platform.md) — Ion Drive concept, goals, core architecture, and the block manifest, condensed from the platform repo.
+- [`docs/specs/`](docs/specs/README.md) — design specs for upcoming blocks (`catalog`, `projects`, `support`, `scheduling`) and the [ERP suite map](docs/specs/erp-suite.md).
 
 ## License
 
