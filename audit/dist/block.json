@@ -1,5 +1,5 @@
 {
-  "$schema": "https://ion-drive.dev/schema/block.json",
+  "$schema": "https://ion-drive.dev/schemas/block-manifest.v1.json",
   "name": "audit",
   "version": "0.1.0",
   "title": "Audit Log",
@@ -12,6 +12,9 @@
   "meta": {
     "icon": "🛰️",
     "docs": "https://ion-drive.dev/blocks/audit"
+  },
+  "requires": {
+    "core": ">=0.2.0 <1.0.0"
   },
   "objects": [
     {

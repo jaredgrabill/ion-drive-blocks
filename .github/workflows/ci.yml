@@ -14,7 +14,7 @@ jobs:
       - run: npm install -g @ion-drive/cli @ion-drive/core
       - name: Validate + pack every block
         run: |
-          for dir in crm invoicing communications audit; do
+          for dir in crm invoicing catalog communications audit; do
             ion-drive block validate "$dir"
             ion-drive block pack "$dir"
           done

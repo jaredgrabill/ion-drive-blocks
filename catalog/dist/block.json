@@ -1,5 +1,5 @@
 {
-  "$schema": "https://ion-drive.dev/schema/block.json",
+  "$schema": "https://ion-drive.dev/schemas/block-manifest.v1.json",
   "name": "catalog",
   "version": "0.1.0",
   "title": "Product Catalog",
@@ -9,9 +9,12 @@
     "commerce",
     "inventory"
   ],
-  "dependencies": [
-    "invoicing"
-  ],
+  "dependencies": {
+    "invoicing": "^0.1.0"
+  },
+  "requires": {
+    "core": ">=0.2.0 <1.0.0"
+  },
   "meta": {
     "icon": "📦",
     "docs": "https://ion-drive.dev/blocks/catalog"

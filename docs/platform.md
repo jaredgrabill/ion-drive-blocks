@@ -116,9 +116,10 @@ schema. Top-level keys:
 
 | Key | What it declares |
 |:--|:--|
-| `name`, `version`, `title`, `description`, `author`, `categories` | Identity + catalog metadata |
+| `name`, `version`, `title`, `description`, `author`, `categories` | Identity + catalog metadata; `version` is a **strict canonical semver** version (no `v` prefix, no build metadata — spec-02) |
+| `dependencies` | Blocks that must be installed first, as a **name → semver-range record** (`{ "crm": "^0.2.0" }`; `"*"` = unconstrained). Missing → 422; installed-but-out-of-range → 422 `DEPENDENCY_VERSION` (`force` overrides with a warning) |
 | `meta` | `icon`, `docs` URL, and `secrets` (name → human description of each secret the code expects) |
-| `requires` | `handlers` (bus handlers that must exist, e.g. `persist_event`) and `plugins` that must be loaded |
+| `requires` | `core` (semver range the running core version must satisfy, checked at install → 400 otherwise), `handlers` (bus handlers that must exist, e.g. `persist_event`), and `plugins` that must be loaded |
 | `objects` | Data objects + fields (see column types above) |
 | `relationships` | Typed links between objects; FK columns materialize as `<relationshipName>_id`; m2m junctions default to `<sourceTable>_<targetTable>`; non-cascade FKs are ON DELETE RESTRICT |
 | `actions` / `hooks` | The declared logic surface (vendored `code/` must register handlers) |
