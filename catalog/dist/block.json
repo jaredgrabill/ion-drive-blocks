@@ -1,0 +1,426 @@
+{
+  "$schema": "https://ion-drive.dev/schema/block.json",
+  "name": "catalog",
+  "version": "0.1.0",
+  "title": "Product Catalog",
+  "description": "Products with prices and lightweight stock tracking — pick a product and the price flows onto the invoice.",
+  "author": "Ion Shift Labs <hello@ionshiftlabs.com>",
+  "categories": [
+    "commerce",
+    "inventory"
+  ],
+  "dependencies": [
+    "invoicing"
+  ],
+  "meta": {
+    "icon": "📦",
+    "docs": "https://ion-drive.dev/blocks/catalog"
+  },
+  "actions": [
+    {
+      "name": "adjust_stock",
+      "description": "Record a signed stock movement for a tracked product and update its stock on hand.",
+      "rbac": {
+        "resource": "stock_moves",
+        "action": "create"
+      },
+      "input": {
+        "type": "object",
+        "properties": {
+          "product_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "The product to adjust (must have track_stock enabled)"
+          },
+          "quantity": {
+            "type": "integer",
+            "description": "Signed quantity: positive to receive, negative to ship"
+          },
+          "reason": {
+            "type": "string",
+            "enum": [
+              "purchase",
+              "sale",
+              "adjustment",
+              "return",
+              "write_off"
+            ],
+            "default": "adjustment",
+            "description": "Why the stock moved"
+          },
+          "reference": {
+            "type": "string",
+            "description": "Free-text pointer (PO number, invoice number, …)"
+          },
+          "notes": {
+            "type": "string",
+            "description": "Free-form notes on the movement"
+          }
+        },
+        "required": [
+          "product_id",
+          "quantity"
+        ]
+      }
+    },
+    {
+      "name": "add_invoice_line",
+      "description": "Add a product to an invoice: snapshots the current price, recomputes the invoice totals, and records a sale stock move for tracked products.",
+      "rbac": {
+        "resource": "line_items",
+        "action": "create"
+      },
+      "input": {
+        "type": "object",
+        "properties": {
+          "invoice_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "The invoice to add the line to"
+          },
+          "product_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "The product to bill (must be active)"
+          },
+          "quantity": {
+            "type": "number",
+            "exclusiveMinimum": 0,
+            "default": 1,
+            "description": "Units billed; must be a whole number for stock-tracked products"
+          },
+          "description": {
+            "type": "string",
+            "description": "Line description override (defaults to the product name)"
+          }
+        },
+        "required": [
+          "invoice_id",
+          "product_id"
+        ]
+      }
+    }
+  ],
+  "objects": [
+    {
+      "name": "products",
+      "displayName": "Products",
+      "description": "Sellable goods, services, and subscriptions with pricing and optional stock tracking.",
+      "fields": [
+        {
+          "name": "sku",
+          "displayName": "SKU",
+          "columnType": "short_text",
+          "isRequired": true,
+          "isUnique": true,
+          "isIndexed": true
+        },
+        {
+          "name": "name",
+          "displayName": "Name",
+          "columnType": "short_text",
+          "isRequired": true,
+          "isIndexed": true
+        },
+        {
+          "name": "kind",
+          "displayName": "Kind",
+          "columnType": "enum",
+          "defaultValue": "good",
+          "constraints": {
+            "enumValues": [
+              "good",
+              "service",
+              "subscription"
+            ]
+          },
+          "uiOptions": {
+            "choiceColors": {
+              "good": "#3b82f6",
+              "service": "#8b5cf6",
+              "subscription": "#f59e0b"
+            }
+          }
+        },
+        {
+          "name": "unit_price",
+          "displayName": "Unit Price",
+          "columnType": "currency",
+          "isRequired": true
+        },
+        {
+          "name": "cost",
+          "displayName": "Cost",
+          "columnType": "currency",
+          "description": "What the unit costs you — for margin reporting."
+        },
+        {
+          "name": "tax_rate",
+          "displayName": "Tax Rate",
+          "columnType": "percentage",
+          "constraints": {
+            "min": 0,
+            "max": 100
+          }
+        },
+        {
+          "name": "unit",
+          "displayName": "Unit",
+          "columnType": "short_text",
+          "description": "How the product is sold: \"each\", \"hour\", \"seat\", …"
+        },
+        {
+          "name": "active",
+          "displayName": "Active",
+          "columnType": "boolean",
+          "defaultValue": "true",
+          "isIndexed": true,
+          "description": "Inactive products cannot be added to invoices."
+        },
+        {
+          "name": "track_stock",
+          "displayName": "Track Stock",
+          "columnType": "boolean",
+          "defaultValue": "false",
+          "description": "Enable stock movements for this product (usually goods only)."
+        },
+        {
+          "name": "stock_on_hand",
+          "displayName": "Stock on Hand",
+          "columnType": "integer",
+          "defaultValue": "0",
+          "description": "Running sum of stock_moves — maintained by the adjust_stock action, do not edit directly. Backorders may push it negative."
+        },
+        {
+          "name": "reorder_point",
+          "displayName": "Reorder Point",
+          "columnType": "integer",
+          "constraints": {
+            "min": 0
+          },
+          "description": "The low-stock report flags tracked products at or below this level."
+        },
+        {
+          "name": "description",
+          "displayName": "Description",
+          "columnType": "long_text"
+        }
+      ]
+    },
+    {
+      "name": "stock_moves",
+      "displayName": "Stock Moves",
+      "description": "Append-only stock ledger; a product's stock_on_hand is the running sum of its moves.",
+      "fields": [
+        {
+          "name": "quantity",
+          "displayName": "Quantity",
+          "columnType": "integer",
+          "isRequired": true,
+          "description": "Signed: positive receives stock, negative ships it."
+        },
+        {
+          "name": "reason",
+          "displayName": "Reason",
+          "columnType": "enum",
+          "defaultValue": "adjustment",
+          "constraints": {
+            "enumValues": [
+              "purchase",
+              "sale",
+              "adjustment",
+              "return",
+              "write_off"
+            ]
+          },
+          "uiOptions": {
+            "choiceColors": {
+              "purchase": "#22c55e",
+              "sale": "#3b82f6",
+              "adjustment": "#6b7280",
+              "return": "#f59e0b",
+              "write_off": "#ef4444"
+            }
+          }
+        },
+        {
+          "name": "moved_at",
+          "displayName": "Moved At",
+          "columnType": "datetime",
+          "isIndexed": true
+        },
+        {
+          "name": "reference",
+          "displayName": "Reference",
+          "columnType": "short_text",
+          "description": "Free-text pointer to the cause: PO number, invoice number, …"
+        },
+        {
+          "name": "notes",
+          "displayName": "Notes",
+          "columnType": "long_text"
+        }
+      ]
+    }
+  ],
+  "relationships": [
+    {
+      "name": "product",
+      "displayName": "Product",
+      "type": "many_to_one",
+      "sourceObjectName": "stock_moves",
+      "targetObjectName": "products",
+      "cascadeDelete": true
+    },
+    {
+      "name": "product",
+      "displayName": "Product",
+      "type": "many_to_one",
+      "sourceObjectName": "line_items",
+      "targetObjectName": "products"
+    }
+  ],
+  "seed": {
+    "products": [
+      {
+        "sku": "WID-STD",
+        "name": "Widget — Standard",
+        "kind": "good",
+        "unit_price": 19.5,
+        "cost": 7.25,
+        "tax_rate": 8.25,
+        "unit": "each",
+        "active": true,
+        "track_stock": true,
+        "stock_on_hand": 0,
+        "reorder_point": 25,
+        "description": "Entry-level widget. Stock starts at zero — receive inventory with adjust_stock."
+      },
+      {
+        "sku": "WID-PRO",
+        "name": "Widget — Pro",
+        "kind": "good",
+        "unit_price": 49,
+        "cost": 18.4,
+        "tax_rate": 8.25,
+        "unit": "each",
+        "active": true,
+        "track_stock": true,
+        "stock_on_hand": 0,
+        "reorder_point": 10,
+        "description": "Heavy-duty widget for production workloads."
+      },
+      {
+        "sku": "WID-LEGACY",
+        "name": "Widget — Legacy",
+        "kind": "good",
+        "unit_price": 12,
+        "cost": 9.8,
+        "tax_rate": 8.25,
+        "unit": "each",
+        "active": false,
+        "track_stock": true,
+        "stock_on_hand": 0,
+        "reorder_point": 0,
+        "description": "Discontinued — kept for invoice history; cannot be added to new invoices."
+      },
+      {
+        "sku": "SVC-CONSULT",
+        "name": "Consulting",
+        "kind": "service",
+        "unit_price": 150,
+        "cost": 90,
+        "unit": "hour",
+        "active": true,
+        "track_stock": false,
+        "description": "Senior consulting time, billed hourly."
+      },
+      {
+        "sku": "SVC-SUPPORT",
+        "name": "Priority Support",
+        "kind": "service",
+        "unit_price": 95,
+        "cost": 55,
+        "unit": "hour",
+        "active": true,
+        "track_stock": false,
+        "description": "Same-day support, billed hourly."
+      },
+      {
+        "sku": "SUB-CLOUD-M",
+        "name": "Cloud Hosting (Monthly)",
+        "kind": "subscription",
+        "unit_price": 49,
+        "cost": 12,
+        "unit": "month",
+        "active": true,
+        "track_stock": false,
+        "description": "Managed hosting, billed monthly per environment."
+      }
+    ]
+  },
+  "roles": [
+    {
+      "name": "catalog_manager",
+      "description": "Manage products; record stock moves. The ledger is append-only — no update/delete on stock_moves.",
+      "permissions": [
+        {
+          "resource": "products",
+          "actions": [
+            "create",
+            "read",
+            "update",
+            "delete"
+          ]
+        },
+        {
+          "resource": "stock_moves",
+          "actions": [
+            "create",
+            "read"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "catalog_viewer",
+      "description": "Read-only access to products and the stock ledger.",
+      "permissions": [
+        {
+          "resource": "products",
+          "actions": [
+            "read"
+          ]
+        },
+        {
+          "resource": "stock_moves",
+          "actions": [
+            "read"
+          ]
+        }
+      ]
+    }
+  ],
+  "tasks": [
+    {
+      "name": "catalog-low-stock-report",
+      "description": "Logs a daily low-stock reminder (disabled by default; upgrade to a real handler that lists stock_on_hand <= reorder_point once task types allow).",
+      "type": "log",
+      "schedule": "0 7 * * *",
+      "enabled": false,
+      "config": {
+        "message": "Catalog low-stock report — check products with stock_on_hand at or below their reorder point."
+      }
+    }
+  ],
+  "code": [
+    {
+      "path": "catalog.ts",
+      "contents": "/**\n * Catalog block — pure domain helpers, no platform imports. Kept separate from\n * index.ts (the plugin wiring) so they are trivially unit-testable and safe to\n * edit without touching handler registration. This file is YOURS.\n */\n\n/** Must match the `kind` enum in block.json. */\nexport const PRODUCT_KINDS = ['good', 'service', 'subscription'] as const;\n\n/** Must match the stock_moves `reason` enum in block.json. */\nexport const STOCK_REASONS = ['purchase', 'sale', 'adjustment', 'return', 'write_off'] as const;\nexport type StockReason = (typeof STOCK_REASONS)[number];\n\n/** Rounds to cents. All money written back to records goes through this. */\nexport function round2(value: number): number {\n  return Math.round(value * 100) / 100;\n}\n\n/** A line's amount: quantity × the unit price snapshotted from the product. */\nexport function lineAmount(quantity: number, unitPrice: number): number {\n  return round2(quantity * unitPrice);\n}\n\n/**\n * Tax owed on a line amount at the product's percentage rate. Computed once,\n * when the line is added — later changes to the product's tax_rate must not\n * rewrite invoice history.\n */\nexport function lineTax(amount: number, taxRate: number | null | undefined): number {\n  if (!taxRate) return 0;\n  return round2((amount * taxRate) / 100);\n}\n\n/** Drops undefined entries so partial writes never set `undefined` columns. */\nexport function compact(data: Record<string, unknown>): Record<string, unknown> {\n  return Object.fromEntries(Object.entries(data).filter(([, v]) => v !== undefined));\n}\n"
+    },
+    {
+      "path": "index.ts",
+      "contents": "/**\n * Catalog block — vendored logic entry point. This file is YOURS.\n *\n * `ion-drive add catalog` copied it to blocks/catalog/ and wired it into\n * blocks/index.ts; your server.ts passes it to `createServer`, which runs\n * `setup` at boot. Everything registered here is declared in the block's\n * manifest, so the platform exposes it automatically:\n *\n *  - action `adjust_stock`     → POST /api/v1/blocks/catalog/actions/adjust_stock\n *  - action `add_invoice_line` → POST /api/v1/blocks/catalog/actions/add_invoice_line\n *    (each is also an MCP tool — `catalog_adjust_stock` etc. — and in the OpenAPI spec)\n *\n * The block extends the invoicing block it depends on: installing it adds a\n * nullable `product_id` FK to invoicing's `line_items`, so existing freeform\n * lines keep working and product-backed lines link back to the catalog.\n *\n * Stock integrity lives entirely in `adjust_stock` / `add_invoice_line`:\n * `stock_moves` is an append-only ledger and `products.stock_on_hand` is its\n * running sum. Writing either directly through the data API skips the other —\n * if they ever drift, the ledger is the source of truth (recount its sum).\n */\nimport { definePlugin } from '@ion-drive/core';\nimport { z } from 'zod';\nimport { STOCK_REASONS, compact, lineAmount, lineTax, round2 } from './catalog.js';\n\n/** The product columns both actions read. */\ntype ProductRecord = {\n  sku: string;\n  name: string;\n  unit_price: string | number;\n  tax_rate: string | number | null;\n  active: boolean;\n  track_stock: boolean;\n  stock_on_hand: number | null;\n};\n\nexport default definePlugin({\n  name: 'catalog',\n\n  setup(ctx) {\n    // ------------------------------------------------------------------\n    // Action: record a signed stock movement (the only sanctioned way to\n    // change stock_on_hand)\n    // ------------------------------------------------------------------\n    ctx.actions.registerAction({\n      block: 'catalog',\n      name: 'adjust_stock',\n      description:\n        'Record a signed stock movement for a tracked product and update its stock on hand.',\n      // The Zod schema validates requests (400 with issues on failure) and\n      // shapes the MCP tool's parameters.\n      input: z.object({\n        product_id: z.string().uuid(),\n        quantity: z\n          .number()\n          .int()\n          .refine((q) => q !== 0, { message: 'quantity must not be zero' }),\n        reason: z.enum(STOCK_REASONS).optional().default('adjustment'),\n        reference: z.string().max(255).optional(),\n        notes: z.string().max(20_000).optional(),\n      }),\n      handler: async (actionCtx) => {\n        const input = actionCtx.input as {\n          product_id: string;\n          quantity: number;\n          reason: (typeof STOCK_REASONS)[number];\n          reference?: string;\n          notes?: string;\n        };\n        const { dataService } = actionCtx;\n\n        const found = await dataService.getById('products', input.product_id);\n        if (!found) throw new Error(`Product ${input.product_id} not found`);\n        const product = found.data as unknown as ProductRecord;\n        if (!product.track_stock) {\n          throw new Error(`Product ${product.sku} does not track stock — enable track_stock first.`);\n        }\n\n        const move = await dataService.create(\n          'stock_moves',\n          compact({\n            quantity: input.quantity,\n            reason: input.reason,\n            moved_at: new Date().toISOString(),\n            reference: input.reference,\n            notes: input.notes,\n            product_id: input.product_id,\n          }),\n        );\n\n        // Read-modify-write: concurrent adjustments can race. The ledger row\n        // above is durable either way — recounting the product's stock_moves\n        // sum repairs stock_on_hand if it ever drifts.\n        const stockOnHand = (product.stock_on_hand ?? 0) + input.quantity;\n        await dataService.update('products', input.product_id, { stock_on_hand: stockOnHand });\n\n        actionCtx.logger.info('Stock adjusted', {\n          sku: product.sku,\n          quantity: input.quantity,\n          reason: input.reason,\n          stockOnHand,\n        });\n        return { move_id: String(move.data.id), stock_on_hand: stockOnHand };\n      },\n    });\n\n    // ------------------------------------------------------------------\n    // Action: add a product to an invoice (price snapshot + totals + stock)\n    // ------------------------------------------------------------------\n    ctx.actions.registerAction({\n      block: 'catalog',\n      name: 'add_invoice_line',\n      description:\n        'Add a product to an invoice: snapshots the current price, recomputes the invoice totals, and records a sale stock move for tracked products.',\n      input: z.object({\n        invoice_id: z.string().uuid(),\n        product_id: z.string().uuid(),\n        quantity: z.number().positive().optional().default(1),\n        description: z.string().max(255).optional(),\n      }),\n      handler: async (actionCtx) => {\n        const input = actionCtx.input as {\n          invoice_id: string;\n          product_id: string;\n          quantity: number;\n          description?: string;\n        };\n        const { dataService } = actionCtx;\n\n        const foundInvoice = await dataService.getById('invoices', input.invoice_id);\n        if (!foundInvoice) throw new Error(`Invoice ${input.invoice_id} not found`);\n        const invoice = foundInvoice.data as {\n          number: string;\n          status: string;\n          tax: string | number | null;\n        };\n        if (invoice.status === 'paid' || invoice.status === 'void') {\n          throw new Error(`Invoice ${invoice.number} is ${invoice.status} — cannot add lines.`);\n        }\n\n        const foundProduct = await dataService.getById('products', input.product_id);\n        if (!foundProduct) throw new Error(`Product ${input.product_id} not found`);\n        const product = foundProduct.data as unknown as ProductRecord;\n        if (!product.active) {\n          throw new Error(`Product ${product.sku} is inactive — reactivate it to bill it.`);\n        }\n        if (product.track_stock && !Number.isInteger(input.quantity)) {\n          throw new Error(`Product ${product.sku} tracks stock — quantity must be a whole number.`);\n        }\n\n        // Snapshot the price onto the line: later price changes must not\n        // rewrite invoice history.\n        const unitPrice = round2(Number(product.unit_price));\n        const amount = lineAmount(input.quantity, unitPrice);\n        const line = await dataService.create(\n          'line_items',\n          compact({\n            description: input.description ?? product.name,\n            quantity: input.quantity,\n            unit_price: unitPrice,\n            amount,\n            invoice_id: input.invoice_id,\n            // The FK this block's relationship added onto invoicing's object.\n            product_id: input.product_id,\n          }),\n        );\n\n        // Subtotal is recomputed from all lines; tax is *incremented* by this\n        // line's share — line_items is invoicing's object, so it has no\n        // tax_rate column to recompute from (blocks can add relationships to a\n        // dependency's objects, not fields). Lines removed via raw CRUD won't\n        // back their tax out — adjust the invoice's tax by hand in that case.\n        let subtotal = 0;\n        for (let page = 1; ; page++) {\n          const batch = await dataService.list('line_items', {\n            filters: [{ field: 'invoice_id', operator: 'eq', value: input.invoice_id }],\n            pagination: { page, pageSize: 200 },\n          });\n          for (const row of batch.data) {\n            subtotal += Number((row as { amount: string | number | null }).amount ?? 0);\n          }\n          if (batch.data.length < 200) break;\n        }\n        subtotal = round2(subtotal);\n        const tax = round2(Number(invoice.tax ?? 0) + lineTax(amount, Number(product.tax_rate ?? 0)));\n        const total = round2(subtotal + tax);\n        await dataService.update('invoices', input.invoice_id, { subtotal, tax, total });\n\n        // Tracked goods leave stock when billed: mirror the sale in the ledger.\n        let stockOnHand: number | undefined;\n        if (product.track_stock) {\n          await dataService.create('stock_moves', {\n            quantity: -input.quantity,\n            reason: 'sale',\n            moved_at: new Date().toISOString(),\n            reference: invoice.number,\n            product_id: input.product_id,\n          });\n          stockOnHand = (product.stock_on_hand ?? 0) - input.quantity;\n          await dataService.update('products', input.product_id, { stock_on_hand: stockOnHand });\n        }\n\n        actionCtx.logger.info('Invoice line added', {\n          invoice: invoice.number,\n          sku: product.sku,\n          quantity: input.quantity,\n          amount,\n        });\n        return {\n          line_item_id: String(line.data.id),\n          amount,\n          invoice: { subtotal, tax, total },\n          ...(stockOnHand !== undefined ? { stock_on_hand: stockOnHand } : {}),\n        };\n      },\n    });\n  },\n});\n"
+    }
+  ]
+}

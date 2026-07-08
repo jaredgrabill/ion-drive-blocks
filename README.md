@@ -9,6 +9,7 @@ One directory per block:
 |:--|:--|
 | `crm/` | Leads, companies, contacts, deals, activities — **vendored conversion/pipeline logic** (`code/`) |
 | `invoicing/` | Invoices, line items, payments — **vendored Stripe logic** (`code/`) |
+| `catalog/` | Products, pricing, stock ledger — **vendored stock/billing logic** (`code/`); extends `invoicing`'s line items with a `product_id` FK |
 | `communications/` | Message log, templates, campaigns |
 | `audit/` | Cluster-wide audit log via the message bus |
 

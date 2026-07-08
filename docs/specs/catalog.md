@@ -1,6 +1,6 @@
 # Block spec: `catalog`
 
-**Status:** draft — not implemented
+**Status:** implemented — shipped as `catalog` 0.1.0 (see [resolved findings](#resolved-during-implementation))
 **Depends on:** `invoicing`
 **Categories:** `commerce`, `inventory`
 **Vendored logic:** yes (`code/` — actions)
@@ -51,9 +51,8 @@ Append-only ledger; `stock_on_hand` is its running sum.
 | `product` | m2o | `line_items` → `products` | **extends a dependency's object** — optional FK so existing freeform line items keep working |
 
 That second relationship is the point of the block: `line_items` (owned by
-`invoicing`) gains a nullable `product_id`. Blocks installing relationships
-onto dependency-owned objects should work since relationships are declared by
-source/target name — verify during implementation (see open questions).
+`invoicing`) gains a nullable `product_id`. Verified working — see
+[resolved findings](#resolved-during-implementation).
 
 ## Actions (vendored)
 
@@ -62,10 +61,16 @@ source/target name — verify during implementation (see open questions).
   `track_stock` is false. RBAC: `stock_moves:create`.
 - **`add_invoice_line`** `{ invoice_id, product_id, quantity?, description? }`
   — creates an invoicing `line_items` row snapshotting the product's current
-  `unit_price`/`tax_rate` (price changes must not rewrite history), links
-  `product_id`, recomputes the invoice total if invoicing stores one, and — if
-  `track_stock` — records a `sale` stock move. RBAC: `line_items:create`
-  (invoicing-owned resource; same cross-block-grant caveat as `support`).
+  `unit_price` (price changes must not rewrite history), links `product_id`,
+  recomputes the invoice subtotal/total, and — if `track_stock` — records a
+  `sale` stock move. RBAC: `line_items:create` (invoicing-owned resource; same
+  cross-block-grant caveat as `support`).
+  *Implementation deviation:* `line_items` (invoicing-owned) has no `tax_rate`
+  column and blocks can only add relationships — not fields — to a
+  dependency's objects, so the line's tax is computed once at add time and
+  **incremented into the invoice's `tax`** rather than snapshotted per line.
+  Lines removed via raw CRUD won't back their tax out; adjust `tax` by hand or
+  add a `remove_invoice_line` action in v0.2.
 
 ## Hooks
 
@@ -94,12 +99,30 @@ logic).
 upgrade to a real handler that lists `stock_on_hand <= reorder_point` once
 task types allow.
 
+## Resolved during implementation
+
+- **Extending dependency objects: ✅ works.** Verified against a live install
+  (real server, scratch Postgres, crm → invoicing → catalog): the installer's
+  only relationship checks are endpoint existence, per-source name uniqueness,
+  and FK column collisions — no ownership rule. `line_items.product_id`
+  materializes on invoicing's table stamped `managedBy: block:catalog` (the FK
+  field inherits the *relationship's* provenance, not the host object's), the
+  FK constraint is enforced (bogus ids rejected, RESTRICT on product delete),
+  `expand=product` hydrates across blocks, and uninstalling `invoicing` while
+  `catalog` is installed is refused with a 409.
+- **Platform finding (filed back to ion-drive): uninstall leaks the FK.**
+  `BlockInstaller.uninstall` only drops the block's `createdObjects`; it never
+  removes relationships the block added onto objects it didn't create. After
+  `remove catalog`, `line_items.product_id` survives as an orphaned uuid
+  column (the constraint dies with the `products` table, the relationship
+  metadata cascade-deletes, the field metadata remains) — and **re-adding
+  catalog then fails** with `Column "product_id" already exists on
+  "line_items"`. Fix belongs in uninstall: remove relationships (and their FK
+  fields) `managedBy block:<name>` whose source object is not in
+  `createdObjects`.
+
 ## Open questions
 
-- **Extending dependency objects:** confirm the installer accepts a
-  relationship whose `sourceObjectName` belongs to another block
-  (`line_items`). If not, this block needs a platform feature first — that
-  finding alone makes the block worth prototyping early.
 - Price lists / per-customer pricing: explicitly out of scope for v0.1; a
   `price_lists` + entries pair layers on cleanly later.
 - Multi-warehouse stock: out of scope; `stock_moves` gains a `location` enum

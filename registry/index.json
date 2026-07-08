@@ -11,6 +11,16 @@
         "0.2.0": "https://raw.githubusercontent.com/jaredgrabill/ion-drive-blocks/main/crm/dist/block.json"
       }
     },
+    "catalog": {
+      "title": "Product Catalog",
+      "description": "Products with prices and lightweight stock tracking — pick a product and the price flows onto the invoice (vendored logic).",
+      "categories": ["commerce", "inventory"],
+      "dependencies": ["invoicing"],
+      "latest": "0.1.0",
+      "versions": {
+        "0.1.0": "https://raw.githubusercontent.com/jaredgrabill/ion-drive-blocks/main/catalog/dist/block.json"
+      }
+    },
     "invoicing": {
       "title": "Invoicing",
       "description": "Invoices, line items, and payments — with Stripe payment links (vendored logic).",

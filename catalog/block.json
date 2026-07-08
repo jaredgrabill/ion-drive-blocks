@@ -1,0 +1,382 @@
+{
+  "$schema": "https://ion-drive.dev/schema/block.json",
+  "name": "catalog",
+  "version": "0.1.0",
+  "title": "Product Catalog",
+  "description": "Products with prices and lightweight stock tracking — pick a product and the price flows onto the invoice.",
+  "author": "Ion Shift Labs <hello@ionshiftlabs.com>",
+  "categories": [
+    "commerce",
+    "inventory"
+  ],
+  "dependencies": [
+    "invoicing"
+  ],
+  "meta": {
+    "icon": "📦",
+    "docs": "https://ion-drive.dev/blocks/catalog"
+  },
+  "actions": [
+    {
+      "name": "adjust_stock",
+      "description": "Record a signed stock movement for a tracked product and update its stock on hand.",
+      "rbac": {
+        "resource": "stock_moves",
+        "action": "create"
+      },
+      "input": {
+        "type": "object",
+        "properties": {
+          "product_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "The product to adjust (must have track_stock enabled)"
+          },
+          "quantity": {
+            "type": "integer",
+            "description": "Signed quantity: positive to receive, negative to ship"
+          },
+          "reason": {
+            "type": "string",
+            "enum": ["purchase", "sale", "adjustment", "return", "write_off"],
+            "default": "adjustment",
+            "description": "Why the stock moved"
+          },
+          "reference": {
+            "type": "string",
+            "description": "Free-text pointer (PO number, invoice number, …)"
+          },
+          "notes": {
+            "type": "string",
+            "description": "Free-form notes on the movement"
+          }
+        },
+        "required": ["product_id", "quantity"]
+      }
+    },
+    {
+      "name": "add_invoice_line",
+      "description": "Add a product to an invoice: snapshots the current price, recomputes the invoice totals, and records a sale stock move for tracked products.",
+      "rbac": {
+        "resource": "line_items",
+        "action": "create"
+      },
+      "input": {
+        "type": "object",
+        "properties": {
+          "invoice_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "The invoice to add the line to"
+          },
+          "product_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "The product to bill (must be active)"
+          },
+          "quantity": {
+            "type": "number",
+            "exclusiveMinimum": 0,
+            "default": 1,
+            "description": "Units billed; must be a whole number for stock-tracked products"
+          },
+          "description": {
+            "type": "string",
+            "description": "Line description override (defaults to the product name)"
+          }
+        },
+        "required": ["invoice_id", "product_id"]
+      }
+    }
+  ],
+  "objects": [
+    {
+      "name": "products",
+      "displayName": "Products",
+      "description": "Sellable goods, services, and subscriptions with pricing and optional stock tracking.",
+      "fields": [
+        {
+          "name": "sku",
+          "displayName": "SKU",
+          "columnType": "short_text",
+          "isRequired": true,
+          "isUnique": true,
+          "isIndexed": true
+        },
+        {
+          "name": "name",
+          "displayName": "Name",
+          "columnType": "short_text",
+          "isRequired": true,
+          "isIndexed": true
+        },
+        {
+          "name": "kind",
+          "displayName": "Kind",
+          "columnType": "enum",
+          "defaultValue": "good",
+          "constraints": {
+            "enumValues": ["good", "service", "subscription"]
+          },
+          "uiOptions": {
+            "choiceColors": {
+              "good": "#3b82f6",
+              "service": "#8b5cf6",
+              "subscription": "#f59e0b"
+            }
+          }
+        },
+        {
+          "name": "unit_price",
+          "displayName": "Unit Price",
+          "columnType": "currency",
+          "isRequired": true
+        },
+        {
+          "name": "cost",
+          "displayName": "Cost",
+          "columnType": "currency",
+          "description": "What the unit costs you — for margin reporting."
+        },
+        {
+          "name": "tax_rate",
+          "displayName": "Tax Rate",
+          "columnType": "percentage",
+          "constraints": {
+            "min": 0,
+            "max": 100
+          }
+        },
+        {
+          "name": "unit",
+          "displayName": "Unit",
+          "columnType": "short_text",
+          "description": "How the product is sold: \"each\", \"hour\", \"seat\", …"
+        },
+        {
+          "name": "active",
+          "displayName": "Active",
+          "columnType": "boolean",
+          "defaultValue": "true",
+          "isIndexed": true,
+          "description": "Inactive products cannot be added to invoices."
+        },
+        {
+          "name": "track_stock",
+          "displayName": "Track Stock",
+          "columnType": "boolean",
+          "defaultValue": "false",
+          "description": "Enable stock movements for this product (usually goods only)."
+        },
+        {
+          "name": "stock_on_hand",
+          "displayName": "Stock on Hand",
+          "columnType": "integer",
+          "defaultValue": "0",
+          "description": "Running sum of stock_moves — maintained by the adjust_stock action, do not edit directly. Backorders may push it negative."
+        },
+        {
+          "name": "reorder_point",
+          "displayName": "Reorder Point",
+          "columnType": "integer",
+          "constraints": {
+            "min": 0
+          },
+          "description": "The low-stock report flags tracked products at or below this level."
+        },
+        {
+          "name": "description",
+          "displayName": "Description",
+          "columnType": "long_text"
+        }
+      ]
+    },
+    {
+      "name": "stock_moves",
+      "displayName": "Stock Moves",
+      "description": "Append-only stock ledger; a product's stock_on_hand is the running sum of its moves.",
+      "fields": [
+        {
+          "name": "quantity",
+          "displayName": "Quantity",
+          "columnType": "integer",
+          "isRequired": true,
+          "description": "Signed: positive receives stock, negative ships it."
+        },
+        {
+          "name": "reason",
+          "displayName": "Reason",
+          "columnType": "enum",
+          "defaultValue": "adjustment",
+          "constraints": {
+            "enumValues": ["purchase", "sale", "adjustment", "return", "write_off"]
+          },
+          "uiOptions": {
+            "choiceColors": {
+              "purchase": "#22c55e",
+              "sale": "#3b82f6",
+              "adjustment": "#6b7280",
+              "return": "#f59e0b",
+              "write_off": "#ef4444"
+            }
+          }
+        },
+        {
+          "name": "moved_at",
+          "displayName": "Moved At",
+          "columnType": "datetime",
+          "isIndexed": true
+        },
+        {
+          "name": "reference",
+          "displayName": "Reference",
+          "columnType": "short_text",
+          "description": "Free-text pointer to the cause: PO number, invoice number, …"
+        },
+        {
+          "name": "notes",
+          "displayName": "Notes",
+          "columnType": "long_text"
+        }
+      ]
+    }
+  ],
+  "relationships": [
+    {
+      "name": "product",
+      "displayName": "Product",
+      "type": "many_to_one",
+      "sourceObjectName": "stock_moves",
+      "targetObjectName": "products",
+      "cascadeDelete": true
+    },
+    {
+      "name": "product",
+      "displayName": "Product",
+      "type": "many_to_one",
+      "sourceObjectName": "line_items",
+      "targetObjectName": "products"
+    }
+  ],
+  "seed": {
+    "products": [
+      {
+        "sku": "WID-STD",
+        "name": "Widget — Standard",
+        "kind": "good",
+        "unit_price": 19.5,
+        "cost": 7.25,
+        "tax_rate": 8.25,
+        "unit": "each",
+        "active": true,
+        "track_stock": true,
+        "stock_on_hand": 0,
+        "reorder_point": 25,
+        "description": "Entry-level widget. Stock starts at zero — receive inventory with adjust_stock."
+      },
+      {
+        "sku": "WID-PRO",
+        "name": "Widget — Pro",
+        "kind": "good",
+        "unit_price": 49,
+        "cost": 18.4,
+        "tax_rate": 8.25,
+        "unit": "each",
+        "active": true,
+        "track_stock": true,
+        "stock_on_hand": 0,
+        "reorder_point": 10,
+        "description": "Heavy-duty widget for production workloads."
+      },
+      {
+        "sku": "WID-LEGACY",
+        "name": "Widget — Legacy",
+        "kind": "good",
+        "unit_price": 12,
+        "cost": 9.8,
+        "tax_rate": 8.25,
+        "unit": "each",
+        "active": false,
+        "track_stock": true,
+        "stock_on_hand": 0,
+        "reorder_point": 0,
+        "description": "Discontinued — kept for invoice history; cannot be added to new invoices."
+      },
+      {
+        "sku": "SVC-CONSULT",
+        "name": "Consulting",
+        "kind": "service",
+        "unit_price": 150,
+        "cost": 90,
+        "unit": "hour",
+        "active": true,
+        "track_stock": false,
+        "description": "Senior consulting time, billed hourly."
+      },
+      {
+        "sku": "SVC-SUPPORT",
+        "name": "Priority Support",
+        "kind": "service",
+        "unit_price": 95,
+        "cost": 55,
+        "unit": "hour",
+        "active": true,
+        "track_stock": false,
+        "description": "Same-day support, billed hourly."
+      },
+      {
+        "sku": "SUB-CLOUD-M",
+        "name": "Cloud Hosting (Monthly)",
+        "kind": "subscription",
+        "unit_price": 49,
+        "cost": 12,
+        "unit": "month",
+        "active": true,
+        "track_stock": false,
+        "description": "Managed hosting, billed monthly per environment."
+      }
+    ]
+  },
+  "roles": [
+    {
+      "name": "catalog_manager",
+      "description": "Manage products; record stock moves. The ledger is append-only — no update/delete on stock_moves.",
+      "permissions": [
+        {
+          "resource": "products",
+          "actions": ["create", "read", "update", "delete"]
+        },
+        {
+          "resource": "stock_moves",
+          "actions": ["create", "read"]
+        }
+      ]
+    },
+    {
+      "name": "catalog_viewer",
+      "description": "Read-only access to products and the stock ledger.",
+      "permissions": [
+        {
+          "resource": "products",
+          "actions": ["read"]
+        },
+        {
+          "resource": "stock_moves",
+          "actions": ["read"]
+        }
+      ]
+    }
+  ],
+  "tasks": [
+    {
+      "name": "catalog-low-stock-report",
+      "description": "Logs a daily low-stock reminder (disabled by default; upgrade to a real handler that lists stock_on_hand <= reorder_point once task types allow).",
+      "type": "log",
+      "schedule": "0 7 * * *",
+      "enabled": false,
+      "config": {
+        "message": "Catalog low-stock report — check products with stock_on_hand at or below their reorder point."
+      }
+    }
+  ]
+}

@@ -9,13 +9,21 @@ subscriptions, seed, roles, tasks). Platform background lives in
 
 | Spec | One-liner | Depends on |
 |:--|:--|:--|
-| [`catalog`](catalog.md) ✅ **confirmed priority** | Products, pricing, and stock — feeds invoicing line items | `invoicing` |
+| [`catalog`](catalog.md) ✅ **shipped 0.1.0** | Products, pricing, and stock — feeds invoicing line items | `invoicing` |
 | [`projects`](projects.md) | Projects, tasks, milestones — delivery after the deal closes | `crm` |
 | [`support`](support.md) | Helpdesk tickets with threaded messages and an inbound hook | `crm` |
 | [`scheduling`](scheduling.md) | Appointment types, bookings, and a public booking hook | `crm` |
 
 Recommended build order: **catalog** (smallest, immediately useful to invoicing,
-and the on-ramp to the ERP suite), then **projects**, **support**, **scheduling**.
+and the on-ramp to the ERP suite — now shipped), then **projects**, **support**,
+**scheduling**.
+
+Building catalog answered the open platform question the ERP suite hinges on:
+**cross-block relationships onto dependency-owned objects install cleanly**
+(FK enforced, `expand=` hydrates, dependency-ordered uninstall guarded). The
+one gap is uninstall hygiene — see the finding in
+[`catalog.md`](catalog.md#resolved-during-implementation) before relying on
+remove → re-add cycles.
 
 ## The ERP direction
 
