@@ -1,9 +1,9 @@
 {
   "$schema": "https://ion-drive.dev/schema/block.json",
   "name": "crm",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "title": "CRM",
-  "description": "Contacts, companies, deals, and activities — a lightweight sales pipeline.",
+  "description": "Leads, companies, contacts, deals, and activities — lead capture, conversion, and a stage-tracked sales pipeline.",
   "author": "Ion Shift Labs <hello@ionshiftlabs.com>",
   "categories": [
     "sales",
@@ -11,9 +11,209 @@
   ],
   "meta": {
     "icon": "🪐",
-    "docs": "https://ion-drive.dev/blocks/crm"
+    "docs": "https://ion-drive.dev/blocks/crm",
+    "secrets": {
+      "crm_inbound_token": "Shared token the inbound_lead hook requires in its x-crm-token header."
+    }
   },
+  "requires": {
+    "handlers": [
+      "persist_event"
+    ],
+    "plugins": []
+  },
+  "actions": [
+    {
+      "name": "convert_lead",
+      "description": "Convert a lead into a company + contact (de-duplicated) and optionally a deal, then mark the lead converted.",
+      "rbac": {
+        "resource": "leads",
+        "action": "update"
+      },
+      "input": {
+        "type": "object",
+        "properties": {
+          "lead_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "The lead to convert"
+          },
+          "create_deal": {
+            "type": "boolean",
+            "default": false,
+            "description": "Also open a deal for the new company/contact"
+          },
+          "deal_title": {
+            "type": "string",
+            "description": "Title for the created deal (defaults to \"<company> — new deal\")"
+          },
+          "amount": {
+            "type": "number",
+            "minimum": 0,
+            "description": "Deal amount"
+          }
+        },
+        "required": ["lead_id"]
+      }
+    },
+    {
+      "name": "set_deal_stage",
+      "description": "Move a deal through the pipeline: applies the stage's default probability, stamps closed_at / lost_reason on close, and logs a note activity.",
+      "rbac": {
+        "resource": "deals",
+        "action": "update"
+      },
+      "input": {
+        "type": "object",
+        "properties": {
+          "deal_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "stage": {
+            "type": "string",
+            "enum": ["prospecting", "qualification", "proposal", "negotiation", "closed_won", "closed_lost"]
+          },
+          "lost_reason": {
+            "type": "string",
+            "enum": ["price", "competitor", "timing", "no_budget", "unresponsive", "other"],
+            "description": "Required context when moving to closed_lost (defaults to \"other\")"
+          }
+        },
+        "required": ["deal_id", "stage"]
+      }
+    },
+    {
+      "name": "log_activity",
+      "description": "Log a call/email/meeting/task/note against a contact, company, and/or deal, stamping last_activity_at on the linked contact and deal.",
+      "rbac": {
+        "resource": "activities",
+        "action": "create"
+      },
+      "input": {
+        "type": "object",
+        "properties": {
+          "subject": { "type": "string" },
+          "type": {
+            "type": "string",
+            "enum": ["call", "email", "meeting", "task", "note"],
+            "default": "note"
+          },
+          "direction": {
+            "type": "string",
+            "enum": ["inbound", "outbound"]
+          },
+          "notes": { "type": "string" },
+          "contact_id": { "type": "string", "format": "uuid" },
+          "company_id": { "type": "string", "format": "uuid" },
+          "deal_id": { "type": "string", "format": "uuid" },
+          "due_date": { "type": "string", "format": "date-time" },
+          "completed": { "type": "boolean" },
+          "duration_minutes": { "type": "integer", "minimum": 0 }
+        },
+        "required": ["subject"]
+      }
+    }
+  ],
+  "hooks": [
+    {
+      "name": "inbound_lead",
+      "description": "Web-to-lead capture endpoint — POST a form payload with the shared x-crm-token header to create a lead (de-duplicated by email)."
+    }
+  ],
   "objects": [
+    {
+      "name": "leads",
+      "displayName": "Leads",
+      "description": "Unqualified inbound interest — captured, worked, then converted into a company/contact/deal or disqualified.",
+      "fields": [
+        {
+          "name": "first_name",
+          "displayName": "First Name",
+          "columnType": "short_text"
+        },
+        {
+          "name": "last_name",
+          "displayName": "Last Name",
+          "columnType": "short_text",
+          "isRequired": true
+        },
+        {
+          "name": "email",
+          "displayName": "Email",
+          "columnType": "email",
+          "isIndexed": true
+        },
+        {
+          "name": "phone",
+          "displayName": "Phone",
+          "columnType": "phone"
+        },
+        {
+          "name": "company_name",
+          "displayName": "Company",
+          "columnType": "short_text",
+          "description": "Company name as captured — becomes (or matches) a companies record on conversion."
+        },
+        {
+          "name": "title",
+          "displayName": "Job Title",
+          "columnType": "short_text"
+        },
+        {
+          "name": "source",
+          "displayName": "Source",
+          "columnType": "enum",
+          "constraints": {
+            "enumValues": [
+              "website",
+              "referral",
+              "outbound",
+              "event",
+              "advertising",
+              "partner",
+              "other"
+            ]
+          }
+        },
+        {
+          "name": "status",
+          "displayName": "Status",
+          "columnType": "enum",
+          "defaultValue": "new",
+          "isIndexed": true,
+          "constraints": {
+            "enumValues": [
+              "new",
+              "working",
+              "qualified",
+              "converted",
+              "disqualified"
+            ]
+          },
+          "uiOptions": {
+            "choiceColors": {
+              "new": "#3b82f6",
+              "working": "#f59e0b",
+              "qualified": "#8b5cf6",
+              "converted": "#22c55e",
+              "disqualified": "#6b7280"
+            }
+          }
+        },
+        {
+          "name": "notes",
+          "displayName": "Notes",
+          "columnType": "long_text"
+        },
+        {
+          "name": "converted_at",
+          "displayName": "Converted At",
+          "columnType": "datetime",
+          "description": "Set by the convert_lead action."
+        }
+      ]
+    },
     {
       "name": "companies",
       "displayName": "Companies",
@@ -25,6 +225,13 @@
           "columnType": "short_text",
           "isRequired": true,
           "isIndexed": true
+        },
+        {
+          "name": "domain",
+          "displayName": "Domain",
+          "columnType": "short_text",
+          "isUnique": true,
+          "description": "Primary email/website domain, e.g. acme.com."
         },
         {
           "name": "website",
@@ -42,6 +249,11 @@
               "healthcare",
               "retail",
               "manufacturing",
+              "education",
+              "real_estate",
+              "energy",
+              "media",
+              "nonprofit",
               "other"
             ]
           }
@@ -49,12 +261,35 @@
         {
           "name": "employee_count",
           "displayName": "Employees",
-          "columnType": "integer"
+          "columnType": "integer",
+          "constraints": {
+            "min": 0
+          }
         },
         {
           "name": "annual_revenue",
           "displayName": "Annual Revenue",
           "columnType": "currency"
+        },
+        {
+          "name": "city",
+          "displayName": "City",
+          "columnType": "short_text"
+        },
+        {
+          "name": "country",
+          "displayName": "Country",
+          "columnType": "short_text"
+        },
+        {
+          "name": "linkedin_url",
+          "displayName": "LinkedIn",
+          "columnType": "url"
+        },
+        {
+          "name": "description",
+          "displayName": "Description",
+          "columnType": "long_text"
         }
       ]
     },
@@ -79,7 +314,8 @@
           "name": "email",
           "displayName": "Email",
           "columnType": "email",
-          "isUnique": true
+          "isUnique": true,
+          "isIndexed": true
         },
         {
           "name": "phone",
@@ -90,13 +326,78 @@
           "name": "title",
           "displayName": "Job Title",
           "columnType": "short_text"
+        },
+        {
+          "name": "lifecycle_stage",
+          "displayName": "Lifecycle Stage",
+          "columnType": "enum",
+          "defaultValue": "lead",
+          "constraints": {
+            "enumValues": [
+              "lead",
+              "marketing_qualified",
+              "sales_qualified",
+              "opportunity",
+              "customer",
+              "churned"
+            ]
+          },
+          "uiOptions": {
+            "choiceColors": {
+              "lead": "#3b82f6",
+              "marketing_qualified": "#8b5cf6",
+              "sales_qualified": "#f59e0b",
+              "opportunity": "#f97316",
+              "customer": "#22c55e",
+              "churned": "#6b7280"
+            }
+          }
+        },
+        {
+          "name": "lead_source",
+          "displayName": "Lead Source",
+          "columnType": "enum",
+          "constraints": {
+            "enumValues": [
+              "website",
+              "referral",
+              "outbound",
+              "event",
+              "advertising",
+              "partner",
+              "other"
+            ]
+          }
+        },
+        {
+          "name": "do_not_contact",
+          "displayName": "Do Not Contact",
+          "columnType": "boolean",
+          "defaultValue": "false"
+        },
+        {
+          "name": "last_activity_at",
+          "displayName": "Last Activity",
+          "columnType": "datetime",
+          "isIndexed": true,
+          "description": "Stamped by the log_activity action."
+        },
+        {
+          "name": "linkedin_url",
+          "displayName": "LinkedIn",
+          "columnType": "url"
+        },
+        {
+          "name": "notes",
+          "displayName": "Notes",
+          "columnType": "long_text"
         }
       ]
     },
     {
       "name": "deals",
       "displayName": "Deals",
-      "description": "Revenue opportunities moving through the pipeline.",
+      "description": "Revenue opportunities moving through the pipeline. Every change is recorded in deal_history.",
       "fields": [
         {
           "name": "title",
@@ -113,29 +414,105 @@
           "name": "stage",
           "displayName": "Stage",
           "columnType": "enum",
-          "defaultValue": "lead",
+          "defaultValue": "prospecting",
+          "isIndexed": true,
           "constraints": {
             "enumValues": [
-              "lead",
-              "qualified",
+              "prospecting",
+              "qualification",
               "proposal",
               "negotiation",
-              "won",
-              "lost"
+              "closed_won",
+              "closed_lost"
             ]
+          },
+          "uiOptions": {
+            "choiceColors": {
+              "prospecting": "#3b82f6",
+              "qualification": "#8b5cf6",
+              "proposal": "#f59e0b",
+              "negotiation": "#f97316",
+              "closed_won": "#22c55e",
+              "closed_lost": "#ef4444"
+            }
           }
+        },
+        {
+          "name": "probability",
+          "displayName": "Probability",
+          "columnType": "percentage",
+          "defaultValue": "10",
+          "constraints": {
+            "min": 0,
+            "max": 100
+          },
+          "description": "Win likelihood in % — set_deal_stage applies per-stage defaults."
         },
         {
           "name": "close_date",
           "displayName": "Expected Close",
           "columnType": "date"
+        },
+        {
+          "name": "closed_at",
+          "displayName": "Closed At",
+          "columnType": "datetime",
+          "description": "Set by set_deal_stage when the deal reaches closed_won/closed_lost."
+        },
+        {
+          "name": "lost_reason",
+          "displayName": "Lost Reason",
+          "columnType": "enum",
+          "constraints": {
+            "enumValues": [
+              "price",
+              "competitor",
+              "timing",
+              "no_budget",
+              "unresponsive",
+              "other"
+            ]
+          }
+        },
+        {
+          "name": "source",
+          "displayName": "Source",
+          "columnType": "enum",
+          "constraints": {
+            "enumValues": [
+              "website",
+              "referral",
+              "outbound",
+              "event",
+              "advertising",
+              "partner",
+              "other"
+            ]
+          }
+        },
+        {
+          "name": "next_step",
+          "displayName": "Next Step",
+          "columnType": "short_text"
+        },
+        {
+          "name": "last_activity_at",
+          "displayName": "Last Activity",
+          "columnType": "datetime",
+          "isIndexed": true,
+          "description": "Stamped by the log_activity and set_deal_stage actions."
+        },
+        {
+          "name": "description",
+          "displayName": "Description",
+          "columnType": "long_text"
         }
       ]
     },
     {
       "name": "activities",
       "displayName": "Activities",
-      "description": "Calls, emails, meetings, and notes.",
+      "description": "Calls, emails, meetings, tasks, and notes — linkable to a contact, company, and/or deal.",
       "fields": [
         {
           "name": "subject",
@@ -153,7 +530,28 @@
               "call",
               "email",
               "meeting",
+              "task",
               "note"
+            ]
+          },
+          "uiOptions": {
+            "choiceColors": {
+              "call": "#3b82f6",
+              "email": "#8b5cf6",
+              "meeting": "#f59e0b",
+              "task": "#f97316",
+              "note": "#6b7280"
+            }
+          }
+        },
+        {
+          "name": "direction",
+          "displayName": "Direction",
+          "columnType": "enum",
+          "constraints": {
+            "enumValues": [
+              "inbound",
+              "outbound"
             ]
           }
         },
@@ -165,13 +563,84 @@
         {
           "name": "due_date",
           "displayName": "Due Date",
-          "columnType": "datetime"
+          "columnType": "datetime",
+          "isIndexed": true
         },
         {
           "name": "completed",
           "displayName": "Completed",
           "columnType": "boolean",
           "defaultValue": "false"
+        },
+        {
+          "name": "completed_at",
+          "displayName": "Completed At",
+          "columnType": "datetime"
+        },
+        {
+          "name": "duration_minutes",
+          "displayName": "Duration (min)",
+          "columnType": "integer",
+          "constraints": {
+            "min": 0
+          }
+        }
+      ]
+    },
+    {
+      "name": "tags",
+      "displayName": "Tags",
+      "description": "Freeform labels attachable to contacts, companies, and deals.",
+      "fields": [
+        {
+          "name": "name",
+          "displayName": "Name",
+          "columnType": "short_text",
+          "isRequired": true,
+          "isUnique": true
+        },
+        {
+          "name": "color",
+          "displayName": "Color",
+          "columnType": "color"
+        }
+      ]
+    },
+    {
+      "name": "deal_history",
+      "displayName": "Deal History",
+      "description": "One row per deal change, written by the persist_event subscription on data.deals.updated — powers stage-velocity reporting.",
+      "fields": [
+        {
+          "name": "changed_at",
+          "displayName": "Changed At",
+          "columnType": "datetime",
+          "isIndexed": true
+        },
+        {
+          "name": "diff",
+          "displayName": "Diff",
+          "columnType": "json",
+          "description": "System-field-free field diff: { field: { before, after } }."
+        },
+        {
+          "name": "snapshot",
+          "displayName": "Snapshot",
+          "columnType": "json",
+          "description": "Full after-image of the deal at the time of the change."
+        },
+        {
+          "name": "changed_by",
+          "displayName": "Changed By",
+          "columnType": "short_text",
+          "description": "Actor id (user or API key) that made the change; empty for system writes."
+        },
+        {
+          "name": "event_id",
+          "displayName": "Event ID",
+          "columnType": "uuid",
+          "isUnique": true,
+          "isIndexed": true
         }
       ]
     }
@@ -206,26 +675,137 @@
       "targetObjectName": "contacts"
     },
     {
+      "name": "company",
+      "displayName": "Company",
+      "type": "many_to_one",
+      "sourceObjectName": "activities",
+      "targetObjectName": "companies"
+    },
+    {
       "name": "deal",
       "displayName": "Deal",
       "type": "many_to_one",
       "sourceObjectName": "activities",
       "targetObjectName": "deals"
+    },
+    {
+      "name": "converted_company",
+      "displayName": "Converted Company",
+      "type": "many_to_one",
+      "sourceObjectName": "leads",
+      "targetObjectName": "companies"
+    },
+    {
+      "name": "converted_contact",
+      "displayName": "Converted Contact",
+      "type": "many_to_one",
+      "sourceObjectName": "leads",
+      "targetObjectName": "contacts"
+    },
+    {
+      "name": "converted_deal",
+      "displayName": "Converted Deal",
+      "type": "many_to_one",
+      "sourceObjectName": "leads",
+      "targetObjectName": "deals"
+    },
+    {
+      "name": "deal",
+      "displayName": "Deal",
+      "type": "many_to_one",
+      "sourceObjectName": "deal_history",
+      "targetObjectName": "deals",
+      "cascadeDelete": true
+    },
+    {
+      "name": "tags",
+      "displayName": "Tags",
+      "type": "many_to_many",
+      "sourceObjectName": "contacts",
+      "targetObjectName": "tags"
+    },
+    {
+      "name": "tags",
+      "displayName": "Tags",
+      "type": "many_to_many",
+      "sourceObjectName": "companies",
+      "targetObjectName": "tags"
+    },
+    {
+      "name": "tags",
+      "displayName": "Tags",
+      "type": "many_to_many",
+      "sourceObjectName": "deals",
+      "targetObjectName": "tags"
+    }
+  ],
+  "subscriptions": [
+    {
+      "event": "data.deals.updated",
+      "consumer": "crm_deal_history",
+      "handler": "persist_event",
+      "config": {
+        "object": "deal_history",
+        "map": {
+          "deal_id": "payload.id",
+          "diff": "payload.diff",
+          "snapshot": "payload.record",
+          "changed_at": "event.occurredAt",
+          "changed_by": "payload.actorId",
+          "event_id": "event.id"
+        }
+      }
     }
   ],
   "seed": {
+    "tags": [
+      {
+        "name": "vip",
+        "color": "#f59e0b"
+      },
+      {
+        "name": "partner",
+        "color": "#8b5cf6"
+      },
+      {
+        "name": "newsletter",
+        "color": "#3b82f6"
+      },
+      {
+        "name": "churn-risk",
+        "color": "#ef4444"
+      }
+    ],
     "companies": [
       {
         "name": "Orbital Dynamics",
+        "domain": "orbital.example",
         "website": "https://orbital.example",
         "industry": "technology",
-        "employee_count": 120
+        "employee_count": 120,
+        "annual_revenue": 18000000,
+        "city": "Denver",
+        "country": "USA"
       },
       {
         "name": "Nova Financial",
+        "domain": "nova.example",
         "website": "https://nova.example",
         "industry": "finance",
-        "employee_count": 40
+        "employee_count": 40,
+        "annual_revenue": 6500000,
+        "city": "New York",
+        "country": "USA"
+      },
+      {
+        "name": "Helios Manufacturing",
+        "domain": "heliosmfg.example",
+        "website": "https://heliosmfg.example",
+        "industry": "manufacturing",
+        "employee_count": 300,
+        "annual_revenue": 42000000,
+        "city": "Detroit",
+        "country": "USA"
       }
     ],
     "contacts": [
@@ -233,56 +813,143 @@
         "first_name": "Ada",
         "last_name": "Vega",
         "email": "ada@orbital.example",
-        "title": "CTO"
+        "title": "CTO",
+        "lifecycle_stage": "opportunity",
+        "lead_source": "outbound"
       },
       {
         "first_name": "Milo",
         "last_name": "Reyes",
         "email": "milo@nova.example",
-        "title": "Head of Ops"
+        "title": "Head of Ops",
+        "lifecycle_stage": "sales_qualified",
+        "lead_source": "referral"
+      },
+      {
+        "first_name": "Priya",
+        "last_name": "Natarajan",
+        "email": "priya@heliosmfg.example",
+        "title": "Plant Director",
+        "lifecycle_stage": "customer",
+        "lead_source": "event"
+      }
+    ],
+    "deals": [
+      {
+        "title": "Orbital Dynamics — Platform license",
+        "amount": 48000,
+        "stage": "proposal",
+        "probability": 50,
+        "close_date": "2026-08-15",
+        "source": "outbound",
+        "next_step": "Send revised proposal"
+      },
+      {
+        "title": "Nova Financial — Onboarding automation",
+        "amount": 22000,
+        "stage": "qualification",
+        "probability": 25,
+        "close_date": "2026-09-01",
+        "source": "referral",
+        "next_step": "Scope workshop with Ops"
+      },
+      {
+        "title": "Helios Manufacturing — Pilot",
+        "amount": 9500,
+        "stage": "closed_won",
+        "probability": 100,
+        "close_date": "2026-06-30",
+        "closed_at": "2026-06-20T16:00:00Z",
+        "source": "event"
+      }
+    ],
+    "leads": [
+      {
+        "first_name": "June",
+        "last_name": "Park",
+        "email": "june@heliosmfg.example",
+        "company_name": "Helios Manufacturing",
+        "title": "VP Operations",
+        "source": "website",
+        "status": "new",
+        "notes": "Requested a demo via the pricing page."
+      },
+      {
+        "first_name": "Omar",
+        "last_name": "Haddad",
+        "email": "omar@stellarlogistics.example",
+        "company_name": "Stellar Logistics",
+        "source": "referral",
+        "status": "working"
       }
     ]
   },
   "roles": [
     {
       "name": "crm_agent",
-      "description": "Full read/write access to CRM objects; no platform administration.",
+      "description": "Full read/write access to CRM objects; deal history is read-only (written by the event subscription).",
       "permissions": [
         {
+          "resource": "leads",
+          "actions": ["create", "read", "update", "delete"]
+        },
+        {
           "resource": "companies",
-          "actions": [
-            "create",
-            "read",
-            "update",
-            "delete"
-          ]
+          "actions": ["create", "read", "update", "delete"]
         },
         {
           "resource": "contacts",
-          "actions": [
-            "create",
-            "read",
-            "update",
-            "delete"
-          ]
+          "actions": ["create", "read", "update", "delete"]
         },
         {
           "resource": "deals",
-          "actions": [
-            "create",
-            "read",
-            "update",
-            "delete"
-          ]
+          "actions": ["create", "read", "update", "delete"]
         },
         {
           "resource": "activities",
-          "actions": [
-            "create",
-            "read",
-            "update",
-            "delete"
-          ]
+          "actions": ["create", "read", "update", "delete"]
+        },
+        {
+          "resource": "tags",
+          "actions": ["create", "read", "update", "delete"]
+        },
+        {
+          "resource": "deal_history",
+          "actions": ["read"]
+        }
+      ]
+    },
+    {
+      "name": "crm_viewer",
+      "description": "Read-only access to every CRM object.",
+      "permissions": [
+        {
+          "resource": "leads",
+          "actions": ["read"]
+        },
+        {
+          "resource": "companies",
+          "actions": ["read"]
+        },
+        {
+          "resource": "contacts",
+          "actions": ["read"]
+        },
+        {
+          "resource": "deals",
+          "actions": ["read"]
+        },
+        {
+          "resource": "activities",
+          "actions": ["read"]
+        },
+        {
+          "resource": "tags",
+          "actions": ["read"]
+        },
+        {
+          "resource": "deal_history",
+          "actions": ["read"]
         }
       ]
     }

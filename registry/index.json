@@ -3,12 +3,12 @@
   "blocks": {
     "crm": {
       "title": "CRM",
-      "description": "Companies, contacts, deals, and activities — a sales pipeline foundation.",
+      "description": "Leads, companies, contacts, deals, and activities — lead capture, conversion, and a stage-tracked pipeline (vendored logic).",
       "categories": ["sales", "crm"],
       "dependencies": [],
-      "latest": "0.1.0",
+      "latest": "0.2.0",
       "versions": {
-        "0.1.0": "https://raw.githubusercontent.com/jaredgrabill/ion-drive-blocks/main/crm/dist/block.json"
+        "0.2.0": "https://raw.githubusercontent.com/jaredgrabill/ion-drive-blocks/main/crm/dist/block.json"
       }
     },
     "invoicing": {

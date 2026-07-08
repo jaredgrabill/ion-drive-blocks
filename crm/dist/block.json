@@ -1,9 +1,9 @@
 {
   "$schema": "https://ion-drive.dev/schema/block.json",
   "name": "crm",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "title": "CRM",
-  "description": "Contacts, companies, deals, and activities — a lightweight sales pipeline.",
+  "description": "Leads, companies, contacts, deals, and activities — lead capture, conversion, and a stage-tracked sales pipeline.",
   "author": "Ion Shift Labs <hello@ionshiftlabs.com>",
   "categories": [
     "sales",
@@ -11,9 +11,260 @@
   ],
   "meta": {
     "icon": "🪐",
-    "docs": "https://ion-drive.dev/blocks/crm"
+    "docs": "https://ion-drive.dev/blocks/crm",
+    "secrets": {
+      "crm_inbound_token": "Shared token the inbound_lead hook requires in its x-crm-token header."
+    }
   },
+  "requires": {
+    "handlers": [
+      "persist_event"
+    ],
+    "plugins": []
+  },
+  "actions": [
+    {
+      "name": "convert_lead",
+      "description": "Convert a lead into a company + contact (de-duplicated) and optionally a deal, then mark the lead converted.",
+      "rbac": {
+        "resource": "leads",
+        "action": "update"
+      },
+      "input": {
+        "type": "object",
+        "properties": {
+          "lead_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "The lead to convert"
+          },
+          "create_deal": {
+            "type": "boolean",
+            "default": false,
+            "description": "Also open a deal for the new company/contact"
+          },
+          "deal_title": {
+            "type": "string",
+            "description": "Title for the created deal (defaults to \"<company> — new deal\")"
+          },
+          "amount": {
+            "type": "number",
+            "minimum": 0,
+            "description": "Deal amount"
+          }
+        },
+        "required": [
+          "lead_id"
+        ]
+      }
+    },
+    {
+      "name": "set_deal_stage",
+      "description": "Move a deal through the pipeline: applies the stage's default probability, stamps closed_at / lost_reason on close, and logs a note activity.",
+      "rbac": {
+        "resource": "deals",
+        "action": "update"
+      },
+      "input": {
+        "type": "object",
+        "properties": {
+          "deal_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "stage": {
+            "type": "string",
+            "enum": [
+              "prospecting",
+              "qualification",
+              "proposal",
+              "negotiation",
+              "closed_won",
+              "closed_lost"
+            ]
+          },
+          "lost_reason": {
+            "type": "string",
+            "enum": [
+              "price",
+              "competitor",
+              "timing",
+              "no_budget",
+              "unresponsive",
+              "other"
+            ],
+            "description": "Required context when moving to closed_lost (defaults to \"other\")"
+          }
+        },
+        "required": [
+          "deal_id",
+          "stage"
+        ]
+      }
+    },
+    {
+      "name": "log_activity",
+      "description": "Log a call/email/meeting/task/note against a contact, company, and/or deal, stamping last_activity_at on the linked contact and deal.",
+      "rbac": {
+        "resource": "activities",
+        "action": "create"
+      },
+      "input": {
+        "type": "object",
+        "properties": {
+          "subject": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "call",
+              "email",
+              "meeting",
+              "task",
+              "note"
+            ],
+            "default": "note"
+          },
+          "direction": {
+            "type": "string",
+            "enum": [
+              "inbound",
+              "outbound"
+            ]
+          },
+          "notes": {
+            "type": "string"
+          },
+          "contact_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "company_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "deal_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "due_date": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "completed": {
+            "type": "boolean"
+          },
+          "duration_minutes": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "subject"
+        ]
+      }
+    }
+  ],
+  "hooks": [
+    {
+      "name": "inbound_lead",
+      "description": "Web-to-lead capture endpoint — POST a form payload with the shared x-crm-token header to create a lead (de-duplicated by email)."
+    }
+  ],
   "objects": [
+    {
+      "name": "leads",
+      "displayName": "Leads",
+      "description": "Unqualified inbound interest — captured, worked, then converted into a company/contact/deal or disqualified.",
+      "fields": [
+        {
+          "name": "first_name",
+          "displayName": "First Name",
+          "columnType": "short_text"
+        },
+        {
+          "name": "last_name",
+          "displayName": "Last Name",
+          "columnType": "short_text",
+          "isRequired": true
+        },
+        {
+          "name": "email",
+          "displayName": "Email",
+          "columnType": "email",
+          "isIndexed": true
+        },
+        {
+          "name": "phone",
+          "displayName": "Phone",
+          "columnType": "phone"
+        },
+        {
+          "name": "company_name",
+          "displayName": "Company",
+          "columnType": "short_text",
+          "description": "Company name as captured — becomes (or matches) a companies record on conversion."
+        },
+        {
+          "name": "title",
+          "displayName": "Job Title",
+          "columnType": "short_text"
+        },
+        {
+          "name": "source",
+          "displayName": "Source",
+          "columnType": "enum",
+          "constraints": {
+            "enumValues": [
+              "website",
+              "referral",
+              "outbound",
+              "event",
+              "advertising",
+              "partner",
+              "other"
+            ]
+          }
+        },
+        {
+          "name": "status",
+          "displayName": "Status",
+          "columnType": "enum",
+          "defaultValue": "new",
+          "isIndexed": true,
+          "constraints": {
+            "enumValues": [
+              "new",
+              "working",
+              "qualified",
+              "converted",
+              "disqualified"
+            ]
+          },
+          "uiOptions": {
+            "choiceColors": {
+              "new": "#3b82f6",
+              "working": "#f59e0b",
+              "qualified": "#8b5cf6",
+              "converted": "#22c55e",
+              "disqualified": "#6b7280"
+            }
+          }
+        },
+        {
+          "name": "notes",
+          "displayName": "Notes",
+          "columnType": "long_text"
+        },
+        {
+          "name": "converted_at",
+          "displayName": "Converted At",
+          "columnType": "datetime",
+          "description": "Set by the convert_lead action."
+        }
+      ]
+    },
     {
       "name": "companies",
       "displayName": "Companies",
@@ -25,6 +276,13 @@
           "columnType": "short_text",
           "isRequired": true,
           "isIndexed": true
+        },
+        {
+          "name": "domain",
+          "displayName": "Domain",
+          "columnType": "short_text",
+          "isUnique": true,
+          "description": "Primary email/website domain, e.g. acme.com."
         },
         {
           "name": "website",
@@ -42,6 +300,11 @@
               "healthcare",
               "retail",
               "manufacturing",
+              "education",
+              "real_estate",
+              "energy",
+              "media",
+              "nonprofit",
               "other"
             ]
           }
@@ -49,12 +312,35 @@
         {
           "name": "employee_count",
           "displayName": "Employees",
-          "columnType": "integer"
+          "columnType": "integer",
+          "constraints": {
+            "min": 0
+          }
         },
         {
           "name": "annual_revenue",
           "displayName": "Annual Revenue",
           "columnType": "currency"
+        },
+        {
+          "name": "city",
+          "displayName": "City",
+          "columnType": "short_text"
+        },
+        {
+          "name": "country",
+          "displayName": "Country",
+          "columnType": "short_text"
+        },
+        {
+          "name": "linkedin_url",
+          "displayName": "LinkedIn",
+          "columnType": "url"
+        },
+        {
+          "name": "description",
+          "displayName": "Description",
+          "columnType": "long_text"
         }
       ]
     },
@@ -79,7 +365,8 @@
           "name": "email",
           "displayName": "Email",
           "columnType": "email",
-          "isUnique": true
+          "isUnique": true,
+          "isIndexed": true
         },
         {
           "name": "phone",
@@ -90,13 +377,78 @@
           "name": "title",
           "displayName": "Job Title",
           "columnType": "short_text"
+        },
+        {
+          "name": "lifecycle_stage",
+          "displayName": "Lifecycle Stage",
+          "columnType": "enum",
+          "defaultValue": "lead",
+          "constraints": {
+            "enumValues": [
+              "lead",
+              "marketing_qualified",
+              "sales_qualified",
+              "opportunity",
+              "customer",
+              "churned"
+            ]
+          },
+          "uiOptions": {
+            "choiceColors": {
+              "lead": "#3b82f6",
+              "marketing_qualified": "#8b5cf6",
+              "sales_qualified": "#f59e0b",
+              "opportunity": "#f97316",
+              "customer": "#22c55e",
+              "churned": "#6b7280"
+            }
+          }
+        },
+        {
+          "name": "lead_source",
+          "displayName": "Lead Source",
+          "columnType": "enum",
+          "constraints": {
+            "enumValues": [
+              "website",
+              "referral",
+              "outbound",
+              "event",
+              "advertising",
+              "partner",
+              "other"
+            ]
+          }
+        },
+        {
+          "name": "do_not_contact",
+          "displayName": "Do Not Contact",
+          "columnType": "boolean",
+          "defaultValue": "false"
+        },
+        {
+          "name": "last_activity_at",
+          "displayName": "Last Activity",
+          "columnType": "datetime",
+          "isIndexed": true,
+          "description": "Stamped by the log_activity action."
+        },
+        {
+          "name": "linkedin_url",
+          "displayName": "LinkedIn",
+          "columnType": "url"
+        },
+        {
+          "name": "notes",
+          "displayName": "Notes",
+          "columnType": "long_text"
         }
       ]
     },
     {
       "name": "deals",
       "displayName": "Deals",
-      "description": "Revenue opportunities moving through the pipeline.",
+      "description": "Revenue opportunities moving through the pipeline. Every change is recorded in deal_history.",
       "fields": [
         {
           "name": "title",
@@ -113,29 +465,105 @@
           "name": "stage",
           "displayName": "Stage",
           "columnType": "enum",
-          "defaultValue": "lead",
+          "defaultValue": "prospecting",
+          "isIndexed": true,
           "constraints": {
             "enumValues": [
-              "lead",
-              "qualified",
+              "prospecting",
+              "qualification",
               "proposal",
               "negotiation",
-              "won",
-              "lost"
+              "closed_won",
+              "closed_lost"
             ]
+          },
+          "uiOptions": {
+            "choiceColors": {
+              "prospecting": "#3b82f6",
+              "qualification": "#8b5cf6",
+              "proposal": "#f59e0b",
+              "negotiation": "#f97316",
+              "closed_won": "#22c55e",
+              "closed_lost": "#ef4444"
+            }
           }
+        },
+        {
+          "name": "probability",
+          "displayName": "Probability",
+          "columnType": "percentage",
+          "defaultValue": "10",
+          "constraints": {
+            "min": 0,
+            "max": 100
+          },
+          "description": "Win likelihood in % — set_deal_stage applies per-stage defaults."
         },
         {
           "name": "close_date",
           "displayName": "Expected Close",
           "columnType": "date"
+        },
+        {
+          "name": "closed_at",
+          "displayName": "Closed At",
+          "columnType": "datetime",
+          "description": "Set by set_deal_stage when the deal reaches closed_won/closed_lost."
+        },
+        {
+          "name": "lost_reason",
+          "displayName": "Lost Reason",
+          "columnType": "enum",
+          "constraints": {
+            "enumValues": [
+              "price",
+              "competitor",
+              "timing",
+              "no_budget",
+              "unresponsive",
+              "other"
+            ]
+          }
+        },
+        {
+          "name": "source",
+          "displayName": "Source",
+          "columnType": "enum",
+          "constraints": {
+            "enumValues": [
+              "website",
+              "referral",
+              "outbound",
+              "event",
+              "advertising",
+              "partner",
+              "other"
+            ]
+          }
+        },
+        {
+          "name": "next_step",
+          "displayName": "Next Step",
+          "columnType": "short_text"
+        },
+        {
+          "name": "last_activity_at",
+          "displayName": "Last Activity",
+          "columnType": "datetime",
+          "isIndexed": true,
+          "description": "Stamped by the log_activity and set_deal_stage actions."
+        },
+        {
+          "name": "description",
+          "displayName": "Description",
+          "columnType": "long_text"
         }
       ]
     },
     {
       "name": "activities",
       "displayName": "Activities",
-      "description": "Calls, emails, meetings, and notes.",
+      "description": "Calls, emails, meetings, tasks, and notes — linkable to a contact, company, and/or deal.",
       "fields": [
         {
           "name": "subject",
@@ -153,7 +581,28 @@
               "call",
               "email",
               "meeting",
+              "task",
               "note"
+            ]
+          },
+          "uiOptions": {
+            "choiceColors": {
+              "call": "#3b82f6",
+              "email": "#8b5cf6",
+              "meeting": "#f59e0b",
+              "task": "#f97316",
+              "note": "#6b7280"
+            }
+          }
+        },
+        {
+          "name": "direction",
+          "displayName": "Direction",
+          "columnType": "enum",
+          "constraints": {
+            "enumValues": [
+              "inbound",
+              "outbound"
             ]
           }
         },
@@ -165,13 +614,84 @@
         {
           "name": "due_date",
           "displayName": "Due Date",
-          "columnType": "datetime"
+          "columnType": "datetime",
+          "isIndexed": true
         },
         {
           "name": "completed",
           "displayName": "Completed",
           "columnType": "boolean",
           "defaultValue": "false"
+        },
+        {
+          "name": "completed_at",
+          "displayName": "Completed At",
+          "columnType": "datetime"
+        },
+        {
+          "name": "duration_minutes",
+          "displayName": "Duration (min)",
+          "columnType": "integer",
+          "constraints": {
+            "min": 0
+          }
+        }
+      ]
+    },
+    {
+      "name": "tags",
+      "displayName": "Tags",
+      "description": "Freeform labels attachable to contacts, companies, and deals.",
+      "fields": [
+        {
+          "name": "name",
+          "displayName": "Name",
+          "columnType": "short_text",
+          "isRequired": true,
+          "isUnique": true
+        },
+        {
+          "name": "color",
+          "displayName": "Color",
+          "columnType": "color"
+        }
+      ]
+    },
+    {
+      "name": "deal_history",
+      "displayName": "Deal History",
+      "description": "One row per deal change, written by the persist_event subscription on data.deals.updated — powers stage-velocity reporting.",
+      "fields": [
+        {
+          "name": "changed_at",
+          "displayName": "Changed At",
+          "columnType": "datetime",
+          "isIndexed": true
+        },
+        {
+          "name": "diff",
+          "displayName": "Diff",
+          "columnType": "json",
+          "description": "System-field-free field diff: { field: { before, after } }."
+        },
+        {
+          "name": "snapshot",
+          "displayName": "Snapshot",
+          "columnType": "json",
+          "description": "Full after-image of the deal at the time of the change."
+        },
+        {
+          "name": "changed_by",
+          "displayName": "Changed By",
+          "columnType": "short_text",
+          "description": "Actor id (user or API key) that made the change; empty for system writes."
+        },
+        {
+          "name": "event_id",
+          "displayName": "Event ID",
+          "columnType": "uuid",
+          "isUnique": true,
+          "isIndexed": true
         }
       ]
     }
@@ -206,26 +726,137 @@
       "targetObjectName": "contacts"
     },
     {
+      "name": "company",
+      "displayName": "Company",
+      "type": "many_to_one",
+      "sourceObjectName": "activities",
+      "targetObjectName": "companies"
+    },
+    {
       "name": "deal",
       "displayName": "Deal",
       "type": "many_to_one",
       "sourceObjectName": "activities",
       "targetObjectName": "deals"
+    },
+    {
+      "name": "converted_company",
+      "displayName": "Converted Company",
+      "type": "many_to_one",
+      "sourceObjectName": "leads",
+      "targetObjectName": "companies"
+    },
+    {
+      "name": "converted_contact",
+      "displayName": "Converted Contact",
+      "type": "many_to_one",
+      "sourceObjectName": "leads",
+      "targetObjectName": "contacts"
+    },
+    {
+      "name": "converted_deal",
+      "displayName": "Converted Deal",
+      "type": "many_to_one",
+      "sourceObjectName": "leads",
+      "targetObjectName": "deals"
+    },
+    {
+      "name": "deal",
+      "displayName": "Deal",
+      "type": "many_to_one",
+      "sourceObjectName": "deal_history",
+      "targetObjectName": "deals",
+      "cascadeDelete": true
+    },
+    {
+      "name": "tags",
+      "displayName": "Tags",
+      "type": "many_to_many",
+      "sourceObjectName": "contacts",
+      "targetObjectName": "tags"
+    },
+    {
+      "name": "tags",
+      "displayName": "Tags",
+      "type": "many_to_many",
+      "sourceObjectName": "companies",
+      "targetObjectName": "tags"
+    },
+    {
+      "name": "tags",
+      "displayName": "Tags",
+      "type": "many_to_many",
+      "sourceObjectName": "deals",
+      "targetObjectName": "tags"
+    }
+  ],
+  "subscriptions": [
+    {
+      "event": "data.deals.updated",
+      "consumer": "crm_deal_history",
+      "handler": "persist_event",
+      "config": {
+        "object": "deal_history",
+        "map": {
+          "deal_id": "payload.id",
+          "diff": "payload.diff",
+          "snapshot": "payload.record",
+          "changed_at": "event.occurredAt",
+          "changed_by": "payload.actorId",
+          "event_id": "event.id"
+        }
+      }
     }
   ],
   "seed": {
+    "tags": [
+      {
+        "name": "vip",
+        "color": "#f59e0b"
+      },
+      {
+        "name": "partner",
+        "color": "#8b5cf6"
+      },
+      {
+        "name": "newsletter",
+        "color": "#3b82f6"
+      },
+      {
+        "name": "churn-risk",
+        "color": "#ef4444"
+      }
+    ],
     "companies": [
       {
         "name": "Orbital Dynamics",
+        "domain": "orbital.example",
         "website": "https://orbital.example",
         "industry": "technology",
-        "employee_count": 120
+        "employee_count": 120,
+        "annual_revenue": 18000000,
+        "city": "Denver",
+        "country": "USA"
       },
       {
         "name": "Nova Financial",
+        "domain": "nova.example",
         "website": "https://nova.example",
         "industry": "finance",
-        "employee_count": 40
+        "employee_count": 40,
+        "annual_revenue": 6500000,
+        "city": "New York",
+        "country": "USA"
+      },
+      {
+        "name": "Helios Manufacturing",
+        "domain": "heliosmfg.example",
+        "website": "https://heliosmfg.example",
+        "industry": "manufacturing",
+        "employee_count": 300,
+        "annual_revenue": 42000000,
+        "city": "Detroit",
+        "country": "USA"
       }
     ],
     "contacts": [
@@ -233,21 +864,91 @@
         "first_name": "Ada",
         "last_name": "Vega",
         "email": "ada@orbital.example",
-        "title": "CTO"
+        "title": "CTO",
+        "lifecycle_stage": "opportunity",
+        "lead_source": "outbound"
       },
       {
         "first_name": "Milo",
         "last_name": "Reyes",
         "email": "milo@nova.example",
-        "title": "Head of Ops"
+        "title": "Head of Ops",
+        "lifecycle_stage": "sales_qualified",
+        "lead_source": "referral"
+      },
+      {
+        "first_name": "Priya",
+        "last_name": "Natarajan",
+        "email": "priya@heliosmfg.example",
+        "title": "Plant Director",
+        "lifecycle_stage": "customer",
+        "lead_source": "event"
+      }
+    ],
+    "deals": [
+      {
+        "title": "Orbital Dynamics — Platform license",
+        "amount": 48000,
+        "stage": "proposal",
+        "probability": 50,
+        "close_date": "2026-08-15",
+        "source": "outbound",
+        "next_step": "Send revised proposal"
+      },
+      {
+        "title": "Nova Financial — Onboarding automation",
+        "amount": 22000,
+        "stage": "qualification",
+        "probability": 25,
+        "close_date": "2026-09-01",
+        "source": "referral",
+        "next_step": "Scope workshop with Ops"
+      },
+      {
+        "title": "Helios Manufacturing — Pilot",
+        "amount": 9500,
+        "stage": "closed_won",
+        "probability": 100,
+        "close_date": "2026-06-30",
+        "closed_at": "2026-06-20T16:00:00Z",
+        "source": "event"
+      }
+    ],
+    "leads": [
+      {
+        "first_name": "June",
+        "last_name": "Park",
+        "email": "june@heliosmfg.example",
+        "company_name": "Helios Manufacturing",
+        "title": "VP Operations",
+        "source": "website",
+        "status": "new",
+        "notes": "Requested a demo via the pricing page."
+      },
+      {
+        "first_name": "Omar",
+        "last_name": "Haddad",
+        "email": "omar@stellarlogistics.example",
+        "company_name": "Stellar Logistics",
+        "source": "referral",
+        "status": "working"
       }
     ]
   },
   "roles": [
     {
       "name": "crm_agent",
-      "description": "Full read/write access to CRM objects; no platform administration.",
+      "description": "Full read/write access to CRM objects; deal history is read-only (written by the event subscription).",
       "permissions": [
+        {
+          "resource": "leads",
+          "actions": [
+            "create",
+            "read",
+            "update",
+            "delete"
+          ]
+        },
         {
           "resource": "companies",
           "actions": [
@@ -283,6 +984,69 @@
             "update",
             "delete"
           ]
+        },
+        {
+          "resource": "tags",
+          "actions": [
+            "create",
+            "read",
+            "update",
+            "delete"
+          ]
+        },
+        {
+          "resource": "deal_history",
+          "actions": [
+            "read"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "crm_viewer",
+      "description": "Read-only access to every CRM object.",
+      "permissions": [
+        {
+          "resource": "leads",
+          "actions": [
+            "read"
+          ]
+        },
+        {
+          "resource": "companies",
+          "actions": [
+            "read"
+          ]
+        },
+        {
+          "resource": "contacts",
+          "actions": [
+            "read"
+          ]
+        },
+        {
+          "resource": "deals",
+          "actions": [
+            "read"
+          ]
+        },
+        {
+          "resource": "activities",
+          "actions": [
+            "read"
+          ]
+        },
+        {
+          "resource": "tags",
+          "actions": [
+            "read"
+          ]
+        },
+        {
+          "resource": "deal_history",
+          "actions": [
+            "read"
+          ]
         }
       ]
     }
@@ -297,6 +1061,16 @@
       "config": {
         "message": "CRM daily digest"
       }
+    }
+  ],
+  "code": [
+    {
+      "path": "crm.ts",
+      "contents": "/**\n * CRM block — pure domain helpers, no platform imports. Kept separate from\n * index.ts (the plugin wiring) so they are trivially unit-testable and safe to\n * edit without touching handler registration. This file is YOURS.\n */\nimport { createHash, timingSafeEqual } from 'node:crypto';\n\n/** Pipeline stages, in order. Must match the `stage` enum in block.json. */\nexport const DEAL_STAGES = [\n  'prospecting',\n  'qualification',\n  'proposal',\n  'negotiation',\n  'closed_won',\n  'closed_lost',\n] as const;\nexport type DealStage = (typeof DEAL_STAGES)[number];\n\n/**\n * Default win probability applied when a deal enters a stage. `set_deal_stage`\n * overwrites the deal's probability with these — tune them to your funnel.\n */\nexport const STAGE_PROBABILITY: Record<DealStage, number> = {\n  prospecting: 10,\n  qualification: 25,\n  proposal: 50,\n  negotiation: 75,\n  closed_won: 100,\n  closed_lost: 0,\n};\n\n/** A closed stage stamps `closed_at`; closed_lost also requires a reason. */\nexport function isClosedStage(stage: DealStage): boolean {\n  return stage === 'closed_won' || stage === 'closed_lost';\n}\n\n/** Must match the `lost_reason` enum in block.json. */\nexport const LOST_REASONS = [\n  'price',\n  'competitor',\n  'timing',\n  'no_budget',\n  'unresponsive',\n  'other',\n] as const;\n\n/** Must match the lead/deal/contact `source` enums in block.json. */\nexport const LEAD_SOURCES = [\n  'website',\n  'referral',\n  'outbound',\n  'event',\n  'advertising',\n  'partner',\n  'other',\n] as const;\n\n/** Must match the activity `type` enum in block.json. */\nexport const ACTIVITY_TYPES = ['call', 'email', 'meeting', 'task', 'note'] as const;\n\n/**\n * Constant-time comparison of a presented token against the stored secret.\n * Hashing both sides first lets `timingSafeEqual` run on equal-length buffers\n * without leaking the secret's length.\n */\nexport function tokenMatches(presented: string | undefined, secret: string): boolean {\n  if (!presented) return false;\n  const a = createHash('sha256').update(presented).digest();\n  const b = createHash('sha256').update(secret).digest();\n  return timingSafeEqual(a, b);\n}\n\n/** Splits a free-form full name into first/last (last word wins the surname). */\nexport function splitFullName(name: string): { first_name?: string; last_name: string } {\n  const parts = name.trim().split(/\\s+/);\n  if (parts.length === 1) return { last_name: parts[0] };\n  return { first_name: parts.slice(0, -1).join(' '), last_name: parts[parts.length - 1] };\n}\n\n/** Escapes LIKE/ILIKE wildcards so user input matches literally. */\nexport function escapeLike(value: string): string {\n  return value.replace(/[\\\\%_]/g, (m) => `\\\\${m}`);\n}\n\n/** Drops undefined entries so partial patches never write `undefined` columns. */\nexport function compact(data: Record<string, unknown>): Record<string, unknown> {\n  return Object.fromEntries(Object.entries(data).filter(([, v]) => v !== undefined));\n}\n"
+    },
+    {
+      "path": "index.ts",
+      "contents": "/**\n * CRM block — vendored logic entry point. This file is YOURS.\n *\n * `ion-drive add crm` copied it to blocks/crm/ and wired it into\n * blocks/index.ts; your server.ts passes it to `createServer`, which runs\n * `setup` at boot. Everything registered here is declared in the block's\n * manifest, so the platform exposes it automatically:\n *\n *  - action `convert_lead`   → POST /api/v1/blocks/crm/actions/convert_lead\n *  - action `set_deal_stage` → POST /api/v1/blocks/crm/actions/set_deal_stage\n *  - action `log_activity`   → POST /api/v1/blocks/crm/actions/log_activity\n *    (each is also an MCP tool — `crm_convert_lead` etc. — and in the OpenAPI spec)\n *  - hook `inbound_lead`     → POST /api/v1/hooks/crm/inbound_lead\n *    (session-auth exempt; authenticity = the shared token we verify)\n *\n * The deal_history trail needs no code at all — it is a manifest subscription\n * on `data.deals.updated` using the built-in `persist_event` bus handler.\n *\n * Setup (one-time): store the web-to-lead shared token as an Ion Drive secret\n * (admin console → Secrets, or POST /api/v1/secrets): `crm_inbound_token`.\n * Point your website form/automation at the hook URL with header\n * `x-crm-token: <that token>`.\n */\nimport { definePlugin } from '@ion-drive/core';\nimport { z } from 'zod';\nimport {\n  ACTIVITY_TYPES,\n  DEAL_STAGES,\n  LEAD_SOURCES,\n  LOST_REASONS,\n  STAGE_PROBABILITY,\n  compact,\n  escapeLike,\n  isClosedStage,\n  splitFullName,\n  tokenMatches,\n} from './crm.js';\n\nexport default definePlugin({\n  name: 'crm',\n\n  setup(ctx) {\n    // ------------------------------------------------------------------\n    // Action: convert a lead into company + contact (+ optional deal)\n    // ------------------------------------------------------------------\n    ctx.actions.registerAction({\n      block: 'crm',\n      name: 'convert_lead',\n      description:\n        'Convert a lead into a company + contact (de-duplicated) and optionally a deal.',\n      // The Zod schema validates requests (400 with issues on failure) and\n      // shapes the MCP tool's parameters.\n      input: z.object({\n        lead_id: z.string().uuid(),\n        create_deal: z.boolean().optional().default(false),\n        deal_title: z.string().min(1).max(255).optional(),\n        amount: z.number().nonnegative().optional(),\n      }),\n      handler: async (actionCtx) => {\n        const input = actionCtx.input as {\n          lead_id: string;\n          create_deal: boolean;\n          deal_title?: string;\n          amount?: number;\n        };\n        const { dataService } = actionCtx;\n\n        const found = await dataService.getById('leads', input.lead_id);\n        if (!found) throw new Error(`Lead ${input.lead_id} not found`);\n        const lead = found.data as {\n          first_name: string | null;\n          last_name: string;\n          email: string | null;\n          phone: string | null;\n          company_name: string | null;\n          title: string | null;\n          source: string | null;\n          status: string;\n          converted_company_id: string | null;\n          converted_contact_id: string | null;\n          converted_deal_id: string | null;\n        };\n\n        // Idempotent: converting twice returns the original conversion.\n        if (lead.status === 'converted') {\n          return {\n            already_converted: true,\n            company_id: lead.converted_company_id,\n            contact_id: lead.converted_contact_id,\n            deal_id: lead.converted_deal_id,\n          };\n        }\n        if (lead.status === 'disqualified') {\n          throw new Error(`Lead ${input.lead_id} is disqualified — re-qualify it first.`);\n        }\n\n        // Company: reuse an existing record by (case-insensitive) name, else create.\n        let companyId: string | null = null;\n        const companyName = lead.company_name?.trim();\n        if (companyName) {\n          const existing = await dataService.list('companies', {\n            filters: [{ field: 'name', operator: 'ilike', value: escapeLike(companyName) }],\n            pagination: { page: 1, pageSize: 1 },\n          });\n          if (existing.data.length > 0) {\n            companyId = String(existing.data[0].id);\n          } else {\n            const created = await dataService.create('companies', { name: companyName });\n            companyId = String(created.data.id);\n          }\n        }\n\n        // Contact: reuse by unique email, else create linked to the company.\n        let contactId: string;\n        const existingContact = lead.email\n          ? await dataService.list('contacts', {\n              filters: [{ field: 'email', operator: 'eq', value: lead.email }],\n              pagination: { page: 1, pageSize: 1 },\n            })\n          : null;\n        if (existingContact && existingContact.data.length > 0) {\n          contactId = String(existingContact.data[0].id);\n        } else {\n          const created = await dataService.create(\n            'contacts',\n            compact({\n              first_name: lead.first_name ?? '—',\n              last_name: lead.last_name,\n              email: lead.email ?? undefined,\n              phone: lead.phone ?? undefined,\n              title: lead.title ?? undefined,\n              lead_source: lead.source ?? undefined,\n              lifecycle_stage: 'sales_qualified',\n              company_id: companyId ?? undefined,\n            }),\n          );\n          contactId = String(created.data.id);\n        }\n\n        // Deal (optional): opens at the top of the pipeline.\n        let dealId: string | null = null;\n        if (input.create_deal) {\n          const created = await dataService.create(\n            'deals',\n            compact({\n              title:\n                input.deal_title ?? `${companyName ?? lead.last_name} — new deal`,\n              amount: input.amount,\n              stage: 'prospecting',\n              probability: STAGE_PROBABILITY.prospecting,\n              source: lead.source ?? undefined,\n              company_id: companyId ?? undefined,\n              primary_contact_id: contactId,\n            }),\n          );\n          dealId = String(created.data.id);\n        }\n\n        await dataService.update(\n          'leads',\n          input.lead_id,\n          compact({\n            status: 'converted',\n            converted_at: new Date().toISOString(),\n            converted_company_id: companyId ?? undefined,\n            converted_contact_id: contactId,\n            converted_deal_id: dealId ?? undefined,\n          }),\n        );\n\n        actionCtx.logger.info('Lead converted', { leadId: input.lead_id, companyId, contactId, dealId });\n        return { already_converted: false, company_id: companyId, contact_id: contactId, deal_id: dealId };\n      },\n    });\n\n    // ------------------------------------------------------------------\n    // Action: move a deal through the pipeline (stage invariants live here)\n    // ------------------------------------------------------------------\n    ctx.actions.registerAction({\n      block: 'crm',\n      name: 'set_deal_stage',\n      description:\n        'Move a deal to a pipeline stage, applying default probability and close bookkeeping.',\n      input: z.object({\n        deal_id: z.string().uuid(),\n        stage: z.enum(DEAL_STAGES),\n        lost_reason: z.enum(LOST_REASONS).optional(),\n      }),\n      handler: async (actionCtx) => {\n        const input = actionCtx.input as {\n          deal_id: string;\n          stage: (typeof DEAL_STAGES)[number];\n          lost_reason?: (typeof LOST_REASONS)[number];\n        };\n        const { dataService } = actionCtx;\n\n        const found = await dataService.getById('deals', input.deal_id);\n        if (!found) throw new Error(`Deal ${input.deal_id} not found`);\n        const deal = found.data as {\n          title: string;\n          stage: string;\n          company_id: string | null;\n          primary_contact_id: string | null;\n        };\n\n        if (deal.stage === input.stage) {\n          return { deal_id: input.deal_id, stage: deal.stage, unchanged: true };\n        }\n\n        const now = new Date().toISOString();\n        const closed = isClosedStage(input.stage);\n        await dataService.update('deals', input.deal_id, {\n          stage: input.stage,\n          probability: STAGE_PROBABILITY[input.stage],\n          // Reopening a closed deal clears the close bookkeeping again.\n          closed_at: closed ? now : null,\n          lost_reason: input.stage === 'closed_lost' ? (input.lost_reason ?? 'other') : null,\n          last_activity_at: now,\n        });\n\n        // Leave a breadcrumb on the activity timeline (deal_history captures\n        // the raw diff; this is the human-readable version).\n        await dataService.create(\n          'activities',\n          compact({\n            subject: `Stage changed: ${deal.stage} → ${input.stage}`,\n            type: 'note',\n            completed: true,\n            completed_at: now,\n            deal_id: input.deal_id,\n            company_id: deal.company_id ?? undefined,\n            contact_id: deal.primary_contact_id ?? undefined,\n          }),\n        );\n\n        actionCtx.logger.info('Deal stage changed', {\n          dealId: input.deal_id,\n          from: deal.stage,\n          to: input.stage,\n        });\n        return {\n          deal_id: input.deal_id,\n          stage: input.stage,\n          probability: STAGE_PROBABILITY[input.stage],\n          closed,\n        };\n      },\n    });\n\n    // ------------------------------------------------------------------\n    // Action: log an activity and stamp last_activity_at on linked records\n    // ------------------------------------------------------------------\n    ctx.actions.registerAction({\n      block: 'crm',\n      name: 'log_activity',\n      description:\n        'Log a call/email/meeting/task/note against a contact, company, and/or deal.',\n      input: z\n        .object({\n          subject: z.string().min(1).max(255),\n          type: z.enum(ACTIVITY_TYPES).optional().default('note'),\n          direction: z.enum(['inbound', 'outbound']).optional(),\n          notes: z.string().max(20_000).optional(),\n          contact_id: z.string().uuid().optional(),\n          company_id: z.string().uuid().optional(),\n          deal_id: z.string().uuid().optional(),\n          due_date: z.string().datetime().optional(),\n          completed: z.boolean().optional(),\n          duration_minutes: z.number().int().nonnegative().optional(),\n        })\n        .refine((v) => v.contact_id || v.company_id || v.deal_id, {\n          message: 'Link the activity to at least one of contact_id, company_id, deal_id.',\n        }),\n      handler: async (actionCtx) => {\n        const input = actionCtx.input as {\n          subject: string;\n          type: (typeof ACTIVITY_TYPES)[number];\n          direction?: string;\n          notes?: string;\n          contact_id?: string;\n          company_id?: string;\n          deal_id?: string;\n          due_date?: string;\n          completed?: boolean;\n          duration_minutes?: number;\n        };\n        const { dataService } = actionCtx;\n        const now = new Date().toISOString();\n\n        const created = await dataService.create(\n          'activities',\n          compact({\n            subject: input.subject,\n            type: input.type,\n            direction: input.direction,\n            notes: input.notes,\n            contact_id: input.contact_id,\n            company_id: input.company_id,\n            deal_id: input.deal_id,\n            due_date: input.due_date,\n            completed: input.completed,\n            completed_at: input.completed ? now : undefined,\n            duration_minutes: input.duration_minutes,\n          }),\n        );\n\n        // Direct POSTs to /api/v1/data/activities bypass this stamping — use\n        // this action (or the crm_log_activity MCP tool) to keep it fresh.\n        if (input.contact_id) {\n          await dataService.update('contacts', input.contact_id, { last_activity_at: now });\n        }\n        if (input.deal_id) {\n          await dataService.update('deals', input.deal_id, { last_activity_at: now });\n        }\n\n        return { activity_id: String(created.data.id) };\n      },\n    });\n\n    // ------------------------------------------------------------------\n    // Hook: web-to-lead capture (shared-token auth → create a lead)\n    // ------------------------------------------------------------------\n    const inboundLeadSchema = z\n      .object({\n        first_name: z.string().max(255).optional(),\n        last_name: z.string().max(255).optional(),\n        /** Free-form full name, split when first/last are not sent separately. */\n        name: z.string().max(255).optional(),\n        email: z.string().email().max(320).optional(),\n        phone: z.string().max(50).optional(),\n        company_name: z.string().max(255).optional(),\n        title: z.string().max(255).optional(),\n        /** Lands in the lead's notes field. */\n        message: z.string().max(20_000).optional(),\n        source: z.enum(LEAD_SOURCES).optional(),\n      })\n      .refine((v) => v.email || v.last_name || v.name, {\n        message: 'Provide at least an email or a name.',\n      });\n\n    ctx.actions.registerHook({\n      block: 'crm',\n      name: 'inbound_lead',\n      description: 'Verifies the shared x-crm-token header and creates a lead from a form payload.',\n      handler: async (hookCtx) => {\n        if (hookCtx.method.toUpperCase() !== 'POST') {\n          return { status: 405, body: { error: 'POST only' } };\n        }\n\n        const secret = await hookCtx.secrets.get('crm_inbound_token');\n        if (!secret) {\n          return { status: 500, body: { error: 'crm_inbound_token is not configured' } };\n        }\n        const presented = hookCtx.headers['x-crm-token'];\n        if (!tokenMatches(Array.isArray(presented) ? presented[0] : presented, secret)) {\n          hookCtx.logger.warn('Rejected inbound lead: bad token');\n          return { status: 401, body: { error: 'invalid token' } };\n        }\n\n        let payload: unknown;\n        try {\n          payload = JSON.parse(hookCtx.rawBody.toString('utf8'));\n        } catch {\n          return { status: 400, body: { error: 'body must be JSON' } };\n        }\n        const parsed = inboundLeadSchema.safeParse(payload);\n        if (!parsed.success) {\n          return { status: 422, body: { error: 'invalid payload', issues: parsed.error.issues } };\n        }\n        const form = parsed.data;\n\n        // De-duplicate repeat form submissions against still-open leads.\n        if (form.email) {\n          const open = await hookCtx.dataService.list('leads', {\n            filters: [\n              { field: 'email', operator: 'eq', value: form.email },\n              { field: 'status', operator: 'in', value: ['new', 'working'] },\n            ],\n            pagination: { page: 1, pageSize: 1 },\n          });\n          if (open.data.length > 0) {\n            return {\n              status: 200,\n              body: { received: true, duplicate: true, lead_id: String(open.data[0].id) },\n            };\n          }\n        }\n\n        // last_name is required on leads (Salesforce convention); derive it\n        // from the full name, falling back to the email's local part.\n        const fromName = form.name ? splitFullName(form.name) : undefined;\n        const lastName =\n          form.last_name ?? fromName?.last_name ?? (form.email ? form.email.split('@')[0] : '');\n\n        const created = await hookCtx.dataService.create(\n          'leads',\n          compact({\n            first_name: form.first_name ?? fromName?.first_name,\n            last_name: lastName,\n            email: form.email,\n            phone: form.phone,\n            company_name: form.company_name,\n            title: form.title,\n            notes: form.message,\n            source: form.source ?? 'website',\n            status: 'new',\n          }),\n        );\n\n        hookCtx.logger.info('Inbound lead captured', { leadId: String(created.data.id) });\n        return { status: 201, body: { received: true, lead_id: String(created.data.id) } };\n      },\n    });\n  },\n});\n"
     }
   ]
 }
