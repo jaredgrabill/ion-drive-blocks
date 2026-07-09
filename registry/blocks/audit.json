@@ -1,5 +1,5 @@
 {
-  "$schema": "https://ion-drive.dev/schemas/registry-block.v1.json",
+  "$schema": "https://iondrive.dev/schemas/registry-block.v1.json",
   "schemaVersion": 1,
   "name": "audit",
   "title": "Audit Log",
@@ -13,9 +13,9 @@
   "versions": {
     "0.1.0": {
       "artifactUrl": "../../audit/dist/0.1.0/block.json",
-      "digest": "sha256:acc5cc83ca50ab1df5a96a43dd54b36bb10424e077dd5e11679a1fe9170cb8be",
-      "size": 2322,
-      "publishedAt": "2026-07-08T22:38:16Z",
+      "digest": "sha256:4fa8ccb64db315df7345f00df4b0017d3e24ae413e60fc0b10e49f2ac6dd48bb",
+      "size": 2320,
+      "publishedAt": "2026-07-09T03:10:46Z",
       "dependencies": {},
       "requires": {
         "core": ">=0.2.0 <1.0.0"

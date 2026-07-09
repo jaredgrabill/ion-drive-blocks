@@ -1,5 +1,5 @@
 {
-  "$schema": "https://ion-drive.dev/schemas/block-manifest.v1.json",
+  "$schema": "https://iondrive.dev/schemas/block-manifest.v1.json",
   "name": "invoicing",
   "version": "0.1.0",
   "title": "Invoicing",
@@ -17,7 +17,7 @@
   },
   "meta": {
     "icon": "🧾",
-    "docs": "https://ion-drive.dev/blocks/invoicing",
+    "docs": "https://iondrive.dev/blocks/invoicing",
     "secrets": {
       "stripe_secret_key": "Stripe API secret key (sk_test_… / sk_live_…) — required by create_payment_link",
       "stripe_webhook_secret": "Stripe webhook signing secret (whsec_…) — required by the stripe hook"

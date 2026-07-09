@@ -1,5 +1,5 @@
 {
-  "$schema": "https://ion-drive.dev/schemas/block-manifest.v1.json",
+  "$schema": "https://iondrive.dev/schemas/block-manifest.v1.json",
   "name": "crm",
   "version": "0.2.0",
   "title": "CRM",
@@ -11,7 +11,7 @@
   ],
   "meta": {
     "icon": "🪐",
-    "docs": "https://ion-drive.dev/blocks/crm",
+    "docs": "https://iondrive.dev/blocks/crm",
     "secrets": {
       "crm_inbound_token": "Shared token the inbound_lead hook requires in its x-crm-token header."
     }

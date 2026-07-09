@@ -1,5 +1,5 @@
 {
-  "$schema": "https://ion-drive.dev/schemas/block-manifest.v1.json",
+  "$schema": "https://iondrive.dev/schemas/block-manifest.v1.json",
   "name": "catalog",
   "version": "0.1.0",
   "title": "Product Catalog",
@@ -17,7 +17,7 @@
   },
   "meta": {
     "icon": "📦",
-    "docs": "https://ion-drive.dev/blocks/catalog"
+    "docs": "https://iondrive.dev/blocks/catalog"
   },
   "actions": [
     {

@@ -1,5 +1,5 @@
 {
-  "$schema": "https://ion-drive.dev/schemas/block-manifest.v1.json",
+  "$schema": "https://iondrive.dev/schemas/block-manifest.v1.json",
   "name": "communications",
   "version": "0.1.0",
   "title": "Communications",
@@ -14,7 +14,7 @@
   },
   "meta": {
     "icon": "📡",
-    "docs": "https://ion-drive.dev/blocks/communications"
+    "docs": "https://iondrive.dev/blocks/communications"
   },
   "requires": {
     "core": ">=0.2.0 <1.0.0"

@@ -1,5 +1,5 @@
 {
-  "$schema": "https://ion-drive.dev/schemas/registry-block.v1.json",
+  "$schema": "https://iondrive.dev/schemas/registry-block.v1.json",
   "schemaVersion": 1,
   "name": "communications",
   "title": "Communications",
@@ -13,9 +13,9 @@
   "versions": {
     "0.1.0": {
       "artifactUrl": "../../communications/dist/0.1.0/block.json",
-      "digest": "sha256:65a02647b473b1d8e87c79eaf5ea226fabefece2b14a0ea10de9f9241b1986be",
-      "size": 3763,
-      "publishedAt": "2026-07-08T22:38:16Z",
+      "digest": "sha256:5bd6a6ab5960637dfe42722c4394b2f969a3926388b6f5a557ff74b592db1335",
+      "size": 3761,
+      "publishedAt": "2026-07-09T03:10:46Z",
       "dependencies": {},
       "requires": {
         "core": ">=0.2.0 <1.0.0"

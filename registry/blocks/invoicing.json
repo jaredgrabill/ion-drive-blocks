@@ -1,5 +1,5 @@
 {
-  "$schema": "https://ion-drive.dev/schemas/registry-block.v1.json",
+  "$schema": "https://iondrive.dev/schemas/registry-block.v1.json",
   "schemaVersion": 1,
   "name": "invoicing",
   "title": "Invoicing",
@@ -13,9 +13,9 @@
   "versions": {
     "0.1.0": {
       "artifactUrl": "../../invoicing/dist/0.1.0/block.json",
-      "digest": "sha256:d382371b56ceb1ae8f3f8eae2b81d4d052d06387538d936b29ec714bcc9e4695",
-      "size": 15848,
-      "publishedAt": "2026-07-08T22:38:16Z",
+      "digest": "sha256:e46915e2dd7a05de142484ca0c0c21cf1f73d5db2f9ed89904c904c203fa8bd3",
+      "size": 15846,
+      "publishedAt": "2026-07-09T03:10:46Z",
       "dependencies": {
         "crm": "^0.2.0"
       },
