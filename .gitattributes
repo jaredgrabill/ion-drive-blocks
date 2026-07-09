@@ -7,3 +7,7 @@ registry/** -text
 schemas/** -text
 registries.json -text
 registry.config.json -text
+# Block READMEs are copied byte-exact into registry/blocks/*.readme.md by
+# `registry build` — EOL translation on the sources would make --check drift.
+*/README.md -text
+badges/** -text

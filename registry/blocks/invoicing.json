@@ -9,6 +9,7 @@
     "billing"
   ],
   "repository": "https://github.com/jaredgrabill/ion-drive-blocks",
+  "readmeUrl": "invoicing.readme.md",
   "latest": "0.1.0",
   "versions": {
     "0.1.0": {

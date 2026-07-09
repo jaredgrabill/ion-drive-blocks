@@ -9,6 +9,7 @@
     "compliance"
   ],
   "repository": "https://github.com/jaredgrabill/ion-drive-blocks",
+  "readmeUrl": "audit.readme.md",
   "latest": "0.1.0",
   "versions": {
     "0.1.0": {

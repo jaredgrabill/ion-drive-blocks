@@ -1,14 +1,9 @@
 {
-  "$schema": "https://iondrive.dev/schemas/registry-index.v1.json",
   "schemaVersion": 1,
-  "name": "Ion Drive Official Blocks",
-  "description": "The main Ion Drive block registry.",
-  "homepage": "https://registry.iondrive.dev",
-  "generatedAt": "2026-07-09T04:05:00Z",
-  "searchUrl": "search-index.json",
-  "registriesUrl": "../registries.json",
-  "blocks": {
-    "audit": {
+  "generatedAt": "2026-07-09T04:24:55Z",
+  "documents": [
+    {
+      "name": "audit",
       "title": "Audit Log",
       "description": "Records every record create/update/delete into an audit_log table, with a system-field-free diff.",
       "categories": [
@@ -16,10 +11,10 @@
         "compliance"
       ],
       "latest": "0.1.0",
-      "blockUrl": "blocks/audit.json",
       "trust": "official"
     },
-    "catalog": {
+    {
+      "name": "catalog",
       "title": "Product Catalog",
       "description": "Products with prices and lightweight stock tracking — pick a product and the price flows onto the invoice.",
       "categories": [
@@ -27,10 +22,10 @@
         "inventory"
       ],
       "latest": "0.1.0",
-      "blockUrl": "blocks/catalog.json",
       "trust": "official"
     },
-    "communications": {
+    {
+      "name": "communications",
       "title": "Communications",
       "description": "Email templates and a notification log for outbound messaging.",
       "categories": [
@@ -38,10 +33,10 @@
         "notifications"
       ],
       "latest": "0.1.0",
-      "blockUrl": "blocks/communications.json",
       "trust": "official"
     },
-    "crm": {
+    {
+      "name": "crm",
       "title": "CRM",
       "description": "Leads, companies, contacts, deals, and activities — lead capture, conversion, and a stage-tracked sales pipeline.",
       "categories": [
@@ -49,10 +44,10 @@
         "crm"
       ],
       "latest": "0.2.0",
-      "blockUrl": "blocks/crm.json",
       "trust": "official"
     },
-    "invoicing": {
+    {
+      "name": "invoicing",
       "title": "Invoicing",
       "description": "Invoices, line items, and payments — billing on top of your CRM.",
       "categories": [
@@ -60,8 +55,7 @@
         "billing"
       ],
       "latest": "0.1.0",
-      "blockUrl": "blocks/invoicing.json",
       "trust": "official"
     }
-  }
+  ]
 }

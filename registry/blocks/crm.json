@@ -9,6 +9,7 @@
     "crm"
   ],
   "repository": "https://github.com/jaredgrabill/ion-drive-blocks",
+  "readmeUrl": "crm.readme.md",
   "latest": "0.2.0",
   "versions": {
     "0.2.0": {

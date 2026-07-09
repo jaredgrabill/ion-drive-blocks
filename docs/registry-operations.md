@@ -12,7 +12,10 @@ registry.config.json        # hand-maintained registry identity (name, repositor
 registries.json             # hand-maintained, PR-reviewed directory of registries
 registry/index.json         # GENERATED — never edit by hand
 registry/blocks/<name>.json # GENERATED — mutable status fields edited via `registry yank`
-<name>/block.json           # block source manifest (+ code/)
+registry/search-index.json  # GENERATED — prebuilt search documents (spec-08)
+registry/blocks/<name>.readme.md # GENERATED — copy of <name>/README.md (spec-08)
+badges/<name>.svg           # GENERATED — shields-style version/trust badge (spec-08)
+<name>/block.json           # block source manifest (+ code/, README.md)
 <name>/dist/<version>/block.json               # immutable released artifact
 <name>/dist/<version>/block.json.sigstore.json # attestation bundle (CI-produced)
 schemas/*.v1.json           # copies of core's published JSON Schemas
@@ -26,7 +29,42 @@ the sources or where released bytes changed.
 translation): their sha256 digests are over exact bytes, and a Windows
 checkout with `core.autocrlf` would otherwise serve CRLF-mangled artifacts
 that fail every consumer's digest verification. Keep those patterns when
-adding new generated paths.
+adding new generated paths (`badges/** -text` covers the emitted SVGs).
+
+## Registry data emissions (spec-08)
+
+`registry build` also regenerates three **display** surfaces beside the
+protocol JSON — all mutable data, **never release artifacts** (they carry no
+digests and never invalidate immutability guarantees):
+
+- `registry/search-index.json` — the prebuilt search documents consumed by
+  `ion-drive search` and the iondrive.dev blocks browser; advertised via the
+  index's `searchUrl`. The index also advertises `registriesUrl` when a valid
+  root `registries.json` exists.
+- `registry/blocks/<name>.readme.md` — a byte-exact copy of the block's
+  `README.md`, advertised via the block doc's `readmeUrl` (keeps consumers
+  same-origin — no raw-GitHub coupling). Deleting a source README deletes the
+  copy on the next build.
+- `badges/<name>.svg` — deterministic shields-style badges (name +
+  `v<latest>` + display-hint trust) for embedding in third-party READMEs:
+  `![crm](https://registry.iondrive.dev/badges/crm.svg)`.
+
+All three are covered by `registry build --check` — CI fails on any drift,
+including hand-edits and stale files. `registry yank`/`deprecate` re-sync
+`latest` into the search index and badge, so a status edit alone never trips
+the drift guard.
+
+## Reviewing a registries-directory PR — submission flow (spec-08)
+
+Third parties submit listings with the PR template at
+`.github/PULL_REQUEST_TEMPLATE/registry-listing.md` (opened via
+`?template=registry-listing.md` on the compare URL — templates in a
+`PULL_REQUEST_TEMPLATE/` directory are only selected through that query
+parameter). Once merged, `ion-drive registry add @<namespace>` (no URL)
+resolves the namespace from `registries.json`, shows owner/url/description
+for confirmation, and writes the user's config. The review checklist lives in
+the next section; the template repeats it for the submitter and says
+explicitly that this is a **listing review, not a code audit**.
 
 ## Testing blocks (spec-06)
 
