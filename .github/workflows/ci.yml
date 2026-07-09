@@ -1,7 +1,8 @@
-# CI for the official block registry (spec-05 §4): glob-discovered validation
-# (never a hardcoded block list — that's how `catalog` used to get skipped),
-# the registry generator's --check as the drift/immutability guard, and a
-# schemas-parity check against the core release the registry is built with.
+# CI for the official block registry (spec-05 §4 + spec-06): glob-discovered
+# validation and `block test` (never a hardcoded block list — that's how
+# `catalog` used to get skipped), the registry generator's --check as the
+# drift/immutability guard, and a schemas-parity check against the core
+# release the registry is built with.
 name: ci
 
 on:
@@ -11,6 +12,22 @@ on:
 jobs:
   validate:
     runs-on: ubuntu-latest
+    services:
+      # `ion-drive block test` creates a scratch database per block on this
+      # Postgres and boots an ephemeral Ion Drive server against it.
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -30,7 +47,18 @@ jobs:
             echo '::endgroup::'
           done
 
-      # TODO(spec-06): add `ion-drive block test <dir>` per block once it exists.
+      # The real install-and-run loop (spec-06): per block, boot an ephemeral
+      # server on a scratch database, install it (dependencies resolved
+      # offline from this repo via --deps-from .), run the built-in assertion
+      # suite + the block's own test/ files, and uninstall with zero residue.
+      - name: Block test every block
+        run: |
+          for manifest in */block.json; do
+            dir=$(dirname "$manifest")
+            echo "::group::block test $dir"
+            ion-drive block test "$dir" --deps-from . --json               --database-url postgresql://postgres:postgres@localhost:5432/postgres
+            echo '::endgroup::'
+          done
 
       # The drift + immutability guard: registry JSON and versioned artifacts
       # must match the sources exactly, and no released dist/<version>/ bytes

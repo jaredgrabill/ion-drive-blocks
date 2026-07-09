@@ -28,6 +28,20 @@ checkout with `core.autocrlf` would otherwise serve CRLF-mangled artifacts
 that fail every consumer's digest verification. Keep those patterns when
 adding new generated paths.
 
+## Testing blocks (spec-06)
+
+CI runs `ion-drive block test <dir> --deps-from .` for every block on every
+push and PR: it creates a scratch database on the workflow's Postgres service
+container, boots a **real** ephemeral Ion Drive server with the block's code
+vendored, installs the block (dependencies resolved offline from this repo),
+runs the built-in assertion suite (install report, data endpoints, action
+reachability, uninstall-leaves-no-residue via the schema doctor) plus the
+block's own `test/*.test.ts` files (`tsx --test` with `ION_TEST_SERVER_URL` /
+`ION_TEST_API_KEY`), and uninstalls. Run the same command locally before
+opening a PR — a green `block test` is required before a block enters the
+registry. Optional per-block `test/fixtures.json` supplies action inputs and
+seed-count expectations.
+
 ## Publishing a version (the normal flow)
 
 1. Edit the block, bump `version` in its `block.json` (strict semver; a
