@@ -34,7 +34,7 @@ jobs:
         with: { node-version: 22 }
 
       # The CLI provides validate/build; core provides the strict Zod parsers.
-      - run: npm install -g @ion-drive/cli@^0.3 @ion-drive/core@^0.3
+      - run: npm install -g @ion-drive/cli@^0.4 @ion-drive/core@^0.4
 
       # Validate every block, discovered by glob — adding a block directory
       # automatically adds it to CI.

@@ -42,7 +42,7 @@ jobs:
       # Pinned to the CLI/core minor this registry is built with; the CLI's
       # version-skew warning covers drift within the range.
       - name: Install Ion Drive CLI + core
-        run: npm install -g @ion-drive/cli@^0.3 @ion-drive/core@^0.3
+        run: npm install -g @ion-drive/cli@^0.4 @ion-drive/core@^0.4
 
       # Guard 1: the generator itself must refuse nothing. --check exits
       # non-zero on pending *additions* too (expected before a publish), so
