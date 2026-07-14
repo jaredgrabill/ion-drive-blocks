@@ -113,7 +113,9 @@ jobs:
           names=$(jq -r '[.packed[] | "\(.name)@\(.version)"] | join(", ")' build.json)
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add -A
+          # build.json/finalize.json are runner-local reports (the summary step
+          # still reads build.json) — exclude them from the publish commit.
+          git add -A -- . ':(exclude)build.json' ':(exclude)finalize.json'
           # No [skip ci]: the publish commit must itself pass CI; change
           # detection makes the triggered re-run a no-op.
           git commit -m "publish: $names"
