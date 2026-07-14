@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "generatedAt": "2026-07-14T03:43:23Z",
+  "generatedAt": "2026-07-14T12:38:33Z",
   "documents": [
     {
       "name": "audit",
@@ -10,7 +10,7 @@
         "observability",
         "compliance"
       ],
-      "latest": "0.1.1",
+      "latest": "0.1.2",
       "trust": "official"
     },
     {

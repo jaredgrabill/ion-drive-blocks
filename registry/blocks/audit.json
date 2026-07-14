@@ -10,8 +10,20 @@
   ],
   "repository": "https://github.com/jaredgrabill/ion-drive-blocks",
   "readmeUrl": "audit.readme.md",
-  "latest": "0.1.1",
+  "latest": "0.1.2",
   "versions": {
+    "0.1.2": {
+      "artifactUrl": "../../audit/dist/0.1.2/block.json",
+      "digest": "sha256:a7754c3e3e44ce6269e064413f89be6e92d78fb92e97ada43008688c64473508",
+      "size": 2363,
+      "publishedAt": "2026-07-14T12:38:33Z",
+      "dependencies": {},
+      "requires": {
+        "core": ">=0.2.0 <1.0.0"
+      },
+      "status": "active",
+      "attestationUrl": "../../audit/dist/0.1.2/block.json.sigstore.json"
+    },
     "0.1.1": {
       "artifactUrl": "../../audit/dist/0.1.1/block.json",
       "digest": "sha256:d5fd84d6edaf1e0132ba627d56c2280132f55f6d1aec9b97c372b41b9d7f4546",

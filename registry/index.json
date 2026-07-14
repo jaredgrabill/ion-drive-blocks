@@ -4,7 +4,7 @@
   "name": "Ion Drive Official Blocks",
   "description": "The main Ion Drive block registry.",
   "homepage": "https://registry.iondrive.dev",
-  "generatedAt": "2026-07-14T03:43:23Z",
+  "generatedAt": "2026-07-14T12:38:33Z",
   "searchUrl": "search-index.json",
   "registriesUrl": "../registries.json",
   "blocks": {
@@ -15,7 +15,7 @@
         "observability",
         "compliance"
       ],
-      "latest": "0.1.1",
+      "latest": "0.1.2",
       "blockUrl": "blocks/audit.json",
       "trust": "official"
     },

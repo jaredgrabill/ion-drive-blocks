@@ -1,0 +1,23 @@
+{
+  "packed": [
+    {
+      "name": "audit",
+      "version": "0.1.2",
+      "artifactPath": "audit/dist/0.1.2/block.json",
+      "digest": "sha256:a7754c3e3e44ce6269e064413f89be6e92d78fb92e97ada43008688c64473508",
+      "size": 2363
+    }
+  ],
+  "wrote": [
+    "/home/runner/work/ion-drive-blocks/ion-drive-blocks/audit/dist/0.1.2/block.json",
+    "/home/runner/work/ion-drive-blocks/ion-drive-blocks/registry/blocks/audit.json",
+    "/home/runner/work/ion-drive-blocks/ion-drive-blocks/registry/index.json",
+    "/home/runner/work/ion-drive-blocks/ion-drive-blocks/registry/search-index.json",
+    "/home/runner/work/ion-drive-blocks/ion-drive-blocks/badges/audit.svg"
+  ],
+  "deleted": [],
+  "refusals": [],
+  "warnings": [],
+  "check": false,
+  "ok": true
+}
