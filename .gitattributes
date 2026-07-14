@@ -11,3 +11,8 @@ registry.config.json -text
 # `registry build` — EOL translation on the sources would make --check drift.
 */README.md -text
 badges/** -text
+# Vendored block sources are embedded byte-for-byte into packed artifacts
+# (`code[].contents`), so EOL translation on a Windows checkout would change
+# every artifact digest `registry build` computes.
+*/code/** -text
+*/test/** -text
